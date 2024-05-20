@@ -1,0 +1,318 @@
+<p>你好，我是高楼。这节课，我们聊一聊全链路压测中 Mock 技术的落地。</p><p>曾经也有不少人问我，在压测过程中，第三方接口响应时间慢怎么办呢？其实，响应时间慢，容量达不到要求，这是在依赖第三方系统的全链路压测过程中必然会面对的问题。这个时候，性能测试还要做，开发也不会为了性能测试修改业务代码，第三方我们也驱动不了。为了解决这个问题，我们就不得不用上Mock技术了。</p><p>什么是Mock呢？简单来说就是指使用各种技术手段模拟出各种需要的资源以供测试使用。Mock技术目前按应用场景主要分两大类：</p><ul>
+<li>Mock 一个对象，构造返回预期的数据，主要适用于单元测试；</li>
+<li>Mock 一个 Server ，构造返回预期的服务，主要适用于接口和性能测试。</li>
+</ul><p>而对于我们全链路压测来说，最主要使用的技术还是Mock Server。</p><p>Mock Server的逻辑是非常直观的：</p><p><img src="https://static001.geekbang.org/resource/image/43/ce/43e31e693dbf6dba460acaeedb03cace.jpg?wh=1920x574" alt="图片"></p><p>通过这张图我们可以看到，真实用户和压测用户是走同样的应用服务节点的。但不同的是，真实用户最终会走到真实的第三方服务，而压测用户会走到Mock Server上去。</p><p>请注意，在全链路压测的过程中，我们要Mock的是压测流量。而在整个逻辑中，我们是直接在应用服务中做标记透传、识别、流量隔离的，所以压测流量和正式流量是用<strong>同样的应用服务</strong>。</p><!-- [[[read_end]]] --><p>说到这里，我还想提一下Service Mesh。现在网上我们经常看到的通过 Service Mesh 实现的全链路逻辑，是在入口的POD上添加tag，并通过网络路由实现对不同版本的转发的。这个逻辑其实也是实现了全链路方式的。逻辑图如下：</p><p><img src="https://static001.geekbang.org/resource/image/bf/e9/bf1399bb62d3b986c79f8ac7a9ac6ee9.jpg?wh=1920x544" alt="图片"></p><p>但是，这种方式有两个点要说明：</p><ol>
+<li>Service Mesh是用不同的应用服务容器来实现的。也就是说，压测流量和正常流量走的已经不是同一个POD中的应用服务了。而我们专栏描述的内容，是会走同样的POD中的应用服务的。</li>
+<li>Service Mesh 的方式无法实现对数据库、缓存、队列等的隔离。</li>
+</ol><p>所以从这两点来看，Service Mesh做灰度发布是完全没问题的，但是要想实现全链路压测的初衷它是做不到的。</p><p>也正是因此，我们才需要用 Mock 的技术手段来做第三方的服务隔离。</p><p>虽然Mock技术并不复杂，但它却是全链路压测过程中不可或缺的一个知识点，所以我们还是把它拆开讲一讲。</p><p>市面上有很多种前后端 Mock Server框架，我们只要根据项目需要搭建最简单实用的 Mock Server 框架解决问题就可以了。如果实在没有框架可以借鉴，我们还可以自己写一个 Mock Server，<strong>反正Mock 的目的就是把不可控变成可控</strong>。</p><p>通常，我们把Mock Server分为<strong>前端Mock Serve</strong>r和<strong>后端Mock Server</strong>。</p><p>不过，因为前端Mock Server主要是为了规避在开发过程中前端等待后端的情况。但是在全链路的逻辑中，使用Mock Server主要是为了规避调用第三方时的影响，所以在全链路压测项目中，我们只要实现后端Mock Server就可以了。</p><p>为了逻辑描述的完整性，这里我还是会给出一个前端Mock Server技术的简单示例，你可以稍做了解。</p><p>下面，我们就来看看前端Mock Server和后端Mock Server各有什么技术吧。</p><h2>前端 Mock Server</h2><p>当前端开发有依赖后端接口的数据时，我们可以在前端自己搭建 nodejs 服务，构造返回预期的服务。那么常见的前端 Mock Server有哪些呢？</p><p>这里我给你提供两个常见的Mock Server： <a href="https://www.npmjs.com/package/server-mock">server-mock</a> 和 <a href="https://github.com/typicode/json-server">json-server</a> 。</p><p>我们以 server-mock 为例，介绍一下它怎么使用。</p><p>第一步，安装完nodejs环境之后，执行 npm 快速安装 server-mock，命令如下：</p><pre><code class="language-bash">npm install -g server-Mock
+</code></pre><p>第二步，在当前目录新建一个文件夹（名字随便，这里我用了 7d）。</p><p>再次输入命令Mock init，输入完毕后，目录下自然会创建两个文件：index.html 与 router.js。</p><p>你可以打开这两个文件查看一下代码。这是一个很简单的demo，index.html 就是一个表单与发送请求的 js 代码；router.js 内是Mock规则，当收到某个特定字段后，Mock Server应该返回相应的响应信息。</p><p>第三步，简单修改下index.html文件：</p><p><img src="https://static001.geekbang.org/resource/image/a9/66/a99c7e76537ddd7756145b72b44eda66.png?wh=1394x270" alt="图片"></p><p>第四步，修改 route.js 文件，对调用的接口和参数设计对应的响应内容：</p><p><img src="https://static001.geekbang.org/resource/image/d9/8b/d96f41cb7d2dc69df1c6d0afd28fe48b.png?wh=503x362" alt="图片"></p><p>第五步，在命令行输入 Mock start 启动server-mock， 终端上就会有下面的提示：</p><pre><code class="language-bash">Success: server start success， open the link http://localhost:8080 in browser 
+</code></pre><p>我们只要根据提示在浏览器中打开地址就能看到效果了。</p><p><img src="https://static001.geekbang.org/resource/image/8f/84/8f1bd83f878713yy7450ee2ac87bbc84.png?wh=724x276" alt="图片"></p><p>另外，你还可以直接在浏览器输入地址，响应结果就是 JSON格式的自定义内容，如下所示：</p><p><img src="https://static001.geekbang.org/resource/image/3b/27/3bfe22e975b12367375a5137940ff227.png?wh=1062x304" alt="图片"></p><p>有了接口响应数据，接下来就可以做前端开发了。</p><h2>后端 Mock Server</h2><p>好了，刚才，我们简单了解了一下前端Mock Server ，并演示了 server-mock 的使用方法。接下来，就要进入我们这节课的重点也就是后端Mock Server了。</p><p>这类Mock Server有很多，下面我们重点介绍一款常用的：Moco。</p><p>简单介绍一下Moco：</p><blockquote>
+<p>Moco 本身支持 API 和独立运行两种方式。通过 API ，开发人员可以在Junit、TestNg 等测试框架里使用 Moco，这样极大地降低了接口测试的复杂度。<br>
+Moco 可以根据一些配置，启动一个真正的 HTTP 服务（监听本地指定端口）。当发起的请求满足一个条件时，就会收到一个 response 。Moco 底层并没有依赖于像 Servlet 这样的重型框架，而是基于 Netty 的网络应用框架编写的，这样就绕过了复杂的应用服务器，所以它的速度是极快的。</p>
+</blockquote><p>了解了Moco的基本特性，接下来我们就看下怎么实现。</p><p>首先第一步，下载Moco的jar（<a href="https://github.com/dreamhead/moco">https://github.com/dreamhead/moco</a>），启动 Moco HTTP Server。</p><pre><code class="language-shell">java -jar &lt;moco-runner-path&gt; http -p &lt;port&gt; -c &lt;configfile-path&gt;
+</code></pre><p>这个启动命令里，这几个参数的含义你可以了解一下：<strong>moco-runner-path</strong>&nbsp;指jar&nbsp;包路径；<strong>port</strong>&nbsp;指HTTP 服务监听端口；<strong>configfile-path</strong>&nbsp;指配置文件路径。</p><p>第二步，在本地启动一个 HTTP 服务器，其中监听端口是 12306，配置文件是 JSON 文件。只需要本机发起一个 request 就可以了，如：<a href="http://localhost:12306">http://localhost:12306</a> 。</p><p>根据不同的请求类型，我们要设计相应的返回值。我给你画了一个简单的思维导图，方便你理清不同类型的接口。</p><p><img src="https://static001.geekbang.org/resource/image/89/12/8912a1b5a103307811f5516e3c098912.jpg?wh=1920x1161" alt="图片"></p><p>针对这张图中几个常见的接口（比如：Get接口、Post接口、带Headers的Post接口、自定义Cookies的Post接口、指定 JSON 响应、指定Status返回值），我们做一下具体的演示。</p><ul>
+<li><strong>Get接口</strong></li>
+</ul><p>返回值JSON内容定义为：</p><pre><code class="language-json">[
+  {
+    "description":"这是一个请求queries",
+    "request":{
+      "uri":"/7d",
+      "queries":{
+        "name":"7DGroup"
+      }
+    },
+    "response":{
+      "text":"success！"
+    }
+  }
+]
+</code></pre><p>通过 Postman 验证服务，测试 Get 请求：</p><p><img src="https://static001.geekbang.org/resource/image/94/55/9414ffd37358768748f4781bb76c8e55.png?wh=1920x1066" alt="图片"></p><p>Moco 服务日志为：</p><pre><code class="language-bash">09 十一月 2021 11:21:04 [nioEventLoopGroup-3-2] INFO  Request received:
+GET /7d HTTP/1.1
+Host: 127.0.0.1:12306
+User-Agent: PostmanRuntime/7.4.0
+Accept: */*
+Accept-Encoding: gzip, deflate
+Cache-Control: no-cache
+Postman-Token: 2d36e386-e022-4478-8acd-258eff4ff684
+X-Lantern-Version: 5.1.0
+Content-Length: 0
+09 十一月 2021 11:21:04 [nioEventLoopGroup-3-2] INFO  Response return:
+HTTP/1.1 200
+Content-Length: 10
+Content-Type: text/plain; charset=utf-8
+success！
+</code></pre><ul>
+<li><strong>Post 接口</strong></li>
+</ul><p>返回值JSON 内容定义如下：</p><pre><code class="language-json">[
+  {
+    "description":"这是一个post请求",
+    "request":{
+      "uri":"/7d",
+      "method":"post"
+    },
+    "response":{
+      "text":"success！"
+    }
+  }
+]
+</code></pre><p>通过 Postman 验证服务，测试 Post 请求：</p><p><img src="https://static001.geekbang.org/resource/image/7a/46/7aa6b89e1b937ff1e2210a717e6b3746.png?wh=1920x844" alt="图片"></p><p>Moco 服务日志为：</p><pre><code class="language-bash">09 十一月 2021 11:29:30 [nioEventLoopGroup-3-2] INFO  Request received:
+POST /7d HTTP/1.1
+Host: 127.0.0.1:12306
+User-Agent: PostmanRuntime/7.4.0
+Content-Length: 0
+Accept: */*
+Accept-Encoding: gzip, deflate
+Cache-Control: no-cache
+Postman-Token: 73f38af1-4efb-473a-b9d2-de0392c65bbe
+X-Lantern-Version: 5.1.0
+09 十一月 2021 11:29:30 [nioEventLoopGroup-3-2] INFO  Response return:
+HTTP/1.1 200
+Content-Length: 10
+Content-Type: text/plain; charset=utf-8
+success！
+</code></pre><ul>
+<li><strong>带Headers的Post接口</strong></li>
+</ul><p>返回值JSON内容定义如下：</p><pre><code class="language-json">[
+  {
+    "description":"这是一个带headers的post请求",
+    "request":{
+      "uri":"/7d",
+      "method":"post",
+      "headers":{
+        "content-type":"application/json"
+      }
+    },
+    "response":{
+      "text":"success！"
+      }
+    }
+]
+</code></pre><p>通过 Postman 验证服务，测试带<strong>Headers</strong>的 Post 请求：</p><p><img src="https://static001.geekbang.org/resource/image/aa/0a/aae7297e712ee72a7210998f8c78d80a.png?wh=1920x883" alt="图片"></p><p>Moco 服务日志为：</p><pre><code class="language-bash">09 十一月 2021 11:34:43 [nioEventLoopGroup-3-2] INFO  Request received:
+POST /7d HTTP/1.1
+Host: 127.0.0.1:12306
+User-Agent: PostmanRuntime/7.4.0
+Content-Length: 0
+Accept: */*
+Accept-Encoding: gzip, deflate
+Cache-Control: no-cache
+Content-Type: application/json
+Postman-Token: 0a82d74b-303f-42a3-9da0-32fd6c604166
+X-Lantern-Version: 5.1.0
+09 十一月 2021 11:34:43 [nioEventLoopGroup-3-2] INFO  Response return:
+HTTP/1.1 200
+Content-Length: 10
+Content-Type: text/plain; charset=utf-8
+success！
+</code></pre><ul>
+<li><strong>自定义Cookies的Post接口</strong></li>
+</ul><p>返回值 JSON 内容定义如下：</p><pre><code class="language-json">[
+  {
+    "description":"这是一个带cookies的post请求",
+    "request":{
+      "uri":"/7d",
+      "method":"post",
+      "cookies":{
+        "login":"7dgroup"
+      }
+    },
+    "response":{
+      "text":"success！"
+      }
+    }
+]
+</code></pre><p>通过 Postman 验证服务，发送带自定义 Cookie的 Post 请求，Post请求中的 Cookie 配置如下：</p><p><img src="https://static001.geekbang.org/resource/image/38/37/38e72dfe57744ec13a4c7716287fe537.png?wh=1730x1032" alt="图片"></p><p>Postman接口配置如下：</p><p><img src="https://static001.geekbang.org/resource/image/d8/43/d8d93baffbc1c7b402121b2e8cfcd643.png?wh=1920x818" alt="图片"></p><p>Moco 服务日志如下：</p><pre><code class="language-bash">09 十一月 2021 12:26:46 [nioEventLoopGroup-3-3] INFO  Request received:
+
+POST /7d HTTP/1.1
+Host: 127.0.0.1:12306
+User-Agent: PostmanRuntime/7.4.0
+Content-Length: 0
+Accept: */*
+Accept-Encoding: gzip, deflate
+Cache-Control: no-cache
+Cookie: login=7dgroup
+Postman-Token: 36a12412-6eb1-44a4-a2d8-ea222eba8968
+X-Lantern-Version: 5.1.0
+
+09 十一月 2021 12:26:46 [nioEventLoopGroup-3-3] INFO  Response return:
+
+HTTP/1.1 200
+Content-Length: 10
+Content-Type: text/plain; charset=utf-8
+
+success！
+</code></pre><ul>
+<li><strong>指定 JSON响应</strong></li>
+</ul><p>返回值JSON内容定义如下：</p><pre><code class="language-json">[
+  {
+    "description":"这是一个指定Json响应的post请求",
+    "request":{
+      "uri":"/7d",
+      "method":"post"
+    },
+    "response":{
+      "json":{
+        "name":"success",
+        "code":"1"
+      }
+    }
+  }
+]
+</code></pre><p>通过 Postman 验证服务，测试 Post 请求：</p><p><img src="https://static001.geekbang.org/resource/image/10/e1/1041c719e1809e1f9761e1828c2008e1.png?wh=1920x828" alt="图片"></p><p>Moco 服务日志如下：</p><pre><code class="language-bash">09 十一月 2021 13:25:19 [nioEventLoopGroup-3-2] INFO  Request received:
+
+POST /7d HTTP/1.1
+Host: 127.0.0.1:12306
+User-Agent: PostmanRuntime/7.4.0
+Content-Length: 0
+Accept: */*
+Accept-Encoding: gzip, deflate
+Cache-Control: no-cache
+Content-Type: multipart/form-data; boundary=--------------------------703341725381001692596870
+Postman-Token: e5686919-85b9-44d0-8a73-61bf804b6377
+X-Lantern-Version: 5.1.0
+
+09 十一月 2021 13:25:19 [nioEventLoopGroup-3-2] INFO  Response return:
+
+HTTP/1.1 200
+Content-Length: 29
+Content-Type: application/json; charset=utf-8
+
+{"name":"success","code":"1"}
+</code></pre><ul>
+<li><strong>指定Status返回值</strong></li>
+</ul><p>返回值JSON内容定义如下：</p><pre><code class="language-json">[
+  {
+    "description":"这是指定响应status的get请求",
+    "request":{
+      "uri":"/7d",
+      "method":"get"
+    },
+    "response":{
+      "status":200
+    }
+  }
+]
+</code></pre><p>通过 Postman 验证服务，测试 Get 请求：</p><p><img src="https://static001.geekbang.org/resource/image/19/11/196212ff1d0c8e4d3362277a1d71ae11.png?wh=1920x837" alt="图片"></p><p>Moco 服务日志如下：</p><pre><code class="language-bash">09 十一月 2021 13:29:07 [nioEventLoopGroup-3-2] INFO  Request received:
+
+GET /7d HTTP/1.1
+Host: 127.0.0.1:12306
+User-Agent: PostmanRuntime/7.4.0
+Accept: */*
+Accept-Encoding: gzip, deflate
+Cache-Control: no-cache
+Content-Type: multipart/form-data; boundary=--------------------------465777039297587100709267
+Postman-Token: 791fa21c-386f-4389-aaa9-ba06d9e53aff
+X-Lantern-Version: 5.1.0
+Content-Length: 0
+
+09 十一月 2021 13:29:07 [nioEventLoopGroup-3-2] INFO  Response return:
+
+HTTP/1.1 200
+</code></pre><p>刚才，我们对常见的接口类型进行了Mock自定义，你可以根据自己的接口类型进行相应的定义。</p><p>不过讲到这里，你可能还会有一个问题，这样的Mock Server可以支持大容量的压力吗？其实是完全可以的，你只要在前面加上一个Nginx，后面的节点数是可以随便添加的，能一直加到满足你的需求为止。</p><h2>系统改造</h2><p>好了，知道了怎么搭建Mock Server之后，现在我们要来解决另一个关键问题，那就是如何基于压测标记实现流量的区分。还记得我们在这节课开头的这张图吧。我们希望，在同一个应用服务中实现正式流量和压测流量的请求（如果你是用Service Mesh做的不同版本的发布，不在这个逻辑之内）。</p><p><img src="https://static001.geekbang.org/resource/image/43/ce/43e31e693dbf6dba460acaeedb03cace.jpg?wh=1920x574" alt="图片"></p><p>注意哦，重点来了！ 请看上面的应用服务C，现在网上我们能看到的几乎所有Mock相关的文章，都是直接把这个应用服务C的后端调用接到了Mock Server上。其实这是有问题的，也不符合全链路压测的逻辑。</p><p>全链路压测的前提是不影响真实的生产服务的同时，又可以在同一应用服务中实现将压测流量转发到Mock Server上去。所以这时，就必须在应用服务C上做逻辑判断。也就是让正式的流量走真实的第三方服务，让压测流量走到Mock Server中去。</p><p>这就是我们需要改造的部分了。因为改造比较简单，这次我们不做demo了，直接在真实系统中改造。</p><p>先来看下我们的整体逻辑设计图：</p><p><img src="https://static001.geekbang.org/resource/image/5d/01/5d50c5ef71be0efc7574d44631c3d501.jpg?wh=1770x1902" alt=""></p><p>在这张图里，HTTP Header透传到Service里后，业务方通过数据上下文获取到压测标记，这时我们要进行判断：</p><ul>
+<li>如果是正式流量，就走Feign Client调用真实的第三方接口；</li>
+<li>如果是压测流量，就走RestTemplate调用Mock Server。</li>
+</ul><p>我们用order服务中典型的需要做第三方Mock的pay接口来详细演示一下实现步骤。</p><p>第一步，在应用服务项目的配置文件application.yaml中添加Mock相关的配置。</p><p><img src="https://static001.geekbang.org/resource/image/1f/91/1fb80f32f92dfb29768ed68e80388c91.png?wh=1258x866" alt="图片"></p><p>第二步，编写Mock配置读取类。</p><pre><code class="language-java">@Log4j2
+@Component
+public class MockConfig {
+
+    @Value("${spring.mock.host}")
+    private String host;
+    
+    @Value("${spring.mock.port}")
+    private String port;
+    
+    public String getHost() {
+        return host;
+    }
+    
+    public String getPort() {
+        return port;
+    }
+    
+}
+</code></pre><p>第三步，编写RestTemplate 配置类，用于后面的HTTP调用。</p><pre><code class="language-java">import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.web.client.RestTemplate;
+
+/**
+ * @description:  RestTemplate 配置类
+ * @author: dunshan
+ * @create: 2021-11-28 16:23
+ **/
+ 
+@Configuration
+public class RestTemplateConfig {
+
+    @Bean
+    public RestTemplate restTemplate(ClientHttpRequestFactory factory) {
+        return new RestTemplate(factory);
+    }
+    
+    @Bean
+    public ClientHttpRequestFactory simpleClientHttpRequestFactory() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setReadTimeout(5000);
+        factory.setConnectTimeout(15000);
+        return factory;
+    }
+    
+}
+</code></pre><p>第四步，在调用pay接口时实现Mock判断。</p><pre><code class="language-java">
+private SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+@Autowired
+RestTemplate restTemplate;
+@Autowired
+MockConfig mockConfig;
+
+@GetMapping("/pay")
+public Object payOrder() {
+
+    HashMap&lt;String, Object&gt; map = new HashMap&lt;&gt;();
+    String name = "";
+    
+    //获取流量标识
+    String flag = AppContext.getContext().getFlag();
+    
+    if (StringUtils.isNoneEmpty(flag)) {
+         //请求 mock 服务
+        String url = String.format("http://%s:%s/7d", mockConfig.getHost(), mockConfig.getPort());
+        ResponseEntity&lt;String&gt; response = restTemplate.getForEntity(url, String.class, name);
+        String body = response.getBody();
+        map.put("ok", JSON.parse(body));
+        map.put("time", sdf.format(new Date()));
+        return map;
+    }
+    
+    //走正常服务
+    map.put("ok", "正式数据");
+    return map;
+    
+}
+</code></pre><p>第五步，Moco 服务响应JSON配置。</p><pre><code class="language-json">[
+  {
+    "description": "这是一个get请求",
+    "request": {
+      "uri": "/7d",
+      "method": "get"
+    },
+    "response": {
+      "json":{
+        "name":"Mock Success",
+        "code":"100"
+      }
+    }
+  }
+]
+
+</code></pre><p>第六步，验证 Mock 服务。</p><p>我们启动JMeter，模拟发送正常流量和压测流量。</p><ul>
+<li>正常流量（不带压测标记）<br>
+<img src="https://static001.geekbang.org/resource/image/f2/69/f2cdb47fcda838601ea7d4a1f79e1f69.png?wh=1920x465" alt="图片"></li>
+</ul><p>返回结果如下：</p><p><img src="https://static001.geekbang.org/resource/image/36/f0/365966e827ac88a22a6a116382ff64f0.png?wh=1336x346" alt="图片"></p><ul>
+<li>压测流量（带压测标记）<br>
+<img src="https://static001.geekbang.org/resource/image/9a/12/9a0c68815aefb15e388b080ee814d412.png?wh=1920x536" alt="图片"></li>
+</ul><p><img src="https://static001.geekbang.org/resource/image/ee/00/eed6e95e575bc5a0f047098f34523400.png?wh=1496x372" alt="图片"></p><p>返回结果如下：</p><p><img src="https://static001.geekbang.org/resource/image/25/63/25a043b6bf42dda429bde72e6206b963.png?wh=1534x574" alt="图片"></p><p>从上面的结果可以看到，压测流量请求会走到Mock Server上；而正常的流量请求会走到真正的第三方服务上。</p><p>到这里，全链路压测的Mock改造就成功了。</p><h2>总结</h2><p>好，这节课就讲到这里。</p><p>刚才，我们介绍了常见的前端和后端Mock Server，并做了详细的演示。我们还演示了系统改造的部分。主要的逻辑，就是业务方从数据上下文中获取压测标记，然后通过判断让它走不同的调用方向。<strong>这里的关键是让压测流量和正常流量在同一个服务中去实现</strong>。这样在全链路线上压测时，才能真正地把所有生产上用到的服务和方法都覆盖到了。</p><p>现在市场上的 Mock Server已经有很多了。至于用哪一种工具其实并不重要，只要能满足需求就可以。如果没有 Mock Server，我们还可以自己写一个服务。</p><p>Mock是一种比较简单易懂的逻辑，但它却能解决全链路压测中对第三方强依赖的问题，这可解决了一个大问题，希望你能够用好它。</p><h2>思考题</h2><p>​学完这节课，我想请你思考两个问题：</p><ol>
+<li>你还知道哪些可以作为Mock Server的应用？各有什么优缺点？</li>
+<li>你觉得Mock Server的配置中，还有哪些难点？</li>
+</ol><p>欢迎你在留言区与我交流讨论。我们下节课见！</p>

@@ -1,0 +1,320 @@
+<p>我们再来看Go语言这个模式，Go语言的这个模式挺好玩儿的。声明一个struct，跟C很一样，然后直接把这个struct类型放到另一个struct里。</p>
+<h1>委托的简单示例</h1>
+<p>我们来看几个示例：</p>
+<pre><code>type Widget struct {
+    X, Y int
+}
+
+type Label struct {
+    Widget        // Embedding (delegation)
+    Text   string // Aggregation
+    X int         // Override 
+}
+
+func (label Label) Paint() {
+	// [0xc4200141e0] - Label.Paint(&quot;State&quot;)
+    fmt.Printf(&quot;[%p] - Label.Paint(%q)\n&quot;, 
+    	&amp;label, label.Text)
+}
+</code></pre>
+<p>由上面可知：</p>
+<ul>
+<li>
+<p>我们声明了一个 <code>Widget</code>，其有 <code>X</code>和<code>Y</code>；</p>
+</li>
+<li>
+<p>然后用它来声明一个 <code>Label</code>，直接把 <code>Widget</code> 委托进去；</p>
+</li>
+<li>
+<p>然后再给 <code>Label</code> 声明并实现了一个 <code>Paint()</code> 方法。</p>
+</li>
+</ul>
+<p>于是，我们就可以这样编程了：</p>
+<pre><code>label := Label{Widget{10, 10}, &quot;State&quot;, 100}
+
+// X=100, Y=10, Text=State, Widget.X=10
+fmt.Printf(&quot;X=%d, Y=%d, Text=%s Widget.X=%d\n&quot;, 
+	label.X, label.Y, label.Text, 
+	label.Widget.X)
+fmt.Println()
+// {Widget:{X:10 Y:10} Text:State X:100} 
+// {{10 10} State 100}
+fmt.Printf(&quot;%+v\n%v\n&quot;, label, label)
+
+label.Paint()
+</code></pre>
+<p>我们可以看到，如果有成员变量重名，则需要手动地解决冲突。</p>
+<!-- [[[read_end]]] -->
+<p>我们继续扩展代码。</p>
+<p>先来一个 <code>Button</code>：</p>
+<pre><code>type Button struct {
+    Label // Embedding (delegation)
+}
+ 
+func NewButton(x, y int, text string) Button {
+    return Button{Label{Widget{x, y}, text, x}}
+}
+func (button Button) Paint() { // Override
+    fmt.Printf(&quot;[%p] - Button.Paint(%q)\n&quot;, 
+    	&amp;button, button.Text)
+}
+func (button Button) Click() {
+    fmt.Printf(&quot;[%p] - Button.Click()\n&quot;, &amp;button)
+}
+</code></pre>
+<p>再来一个 <code>ListBox</code>：</p>
+<pre><code>type ListBox struct {
+    Widget          // Embedding (delegation)
+    Texts  []string // Aggregation
+    Index  int      // Aggregation
+}
+func (listBox ListBox) Paint() {
+    fmt.Printf(&quot;[%p] - ListBox.Paint(%q)\n&quot;, 
+    	&amp;listBox, listBox.Texts)
+}
+func (listBox ListBox) Click() {
+    fmt.Printf(&quot;[%p] - ListBox.Click()\n&quot;, &amp;listBox)
+}
+</code></pre>
+<p>然后，声明两个接口用于多态：</p>
+<pre><code>type Painter interface {
+    Paint()
+}
+
+type Clicker interface {
+    Click()
+}
+</code></pre>
+<p>于是我们就可以这样泛型地使用（注意其中的两个for循环）：</p>
+<pre><code>button1 := Button{Label{Widget{10, 70}, &quot;OK&quot;, 10}}
+button2 := NewButton(50, 70, &quot;Cancel&quot;)
+listBox := ListBox{Widget{10, 40}, 
+    []string{&quot;AL&quot;, &quot;AK&quot;, &quot;AZ&quot;, &quot;AR&quot;}, 0}
+
+fmt.Println()
+//[0xc4200142d0] - Label.Paint(&quot;State&quot;)
+//[0xc420014300] - ListBox.Paint([&quot;AL&quot; &quot;AK&quot; &quot;AZ&quot; &quot;AR&quot;])
+//[0xc420014330] - Button.Paint(&quot;OK&quot;)
+//[0xc420014360] - Button.Paint(&quot;Cancel&quot;)
+for _, painter := range []Painter{label, listBox, button1, button2} {
+	painter.Paint()
+}
+
+fmt.Println()
+//[0xc420014450] - ListBox.Click()
+//[0xc420014480] - Button.Click()
+//[0xc4200144b0] - Button.Click()
+for _, widget := range []interface{}{label, listBox, button1, button2} {
+    if clicker, ok := widget.(Clicker); ok {
+    	clicker.Click()
+    }
+}
+</code></pre>
+<h1>一个 Undo 的委托重构</h1>
+<p>上面这个是 Go 语言中的委托和接口多态的编程方式，其实是面向对象和原型编程综合的玩法。这个玩法可不可以玩得更有意思呢？这是可以的。</p>
+<p>首先，我们先声明一个数据容器，其中有 <code>Add()</code>、 <code>Delete()</code> 和 <code>Contains()</code> 方法。还有一个转字符串的方法。</p>
+<pre><code>type IntSet struct {
+    data map[int]bool
+}
+
+func NewIntSet() IntSet {
+    return IntSet{make(map[int]bool)}
+}
+
+func (set *IntSet) Add(x int) {
+    set.data[x] = true
+}
+
+func (set *IntSet) Delete(x int) {
+    delete(set.data, x)
+}
+
+func (set *IntSet) Contains(x int) bool {
+    return set.data[x]
+}
+
+func (set *IntSet) String() string { // Satisfies fmt.Stringer interface
+    if len(set.data) == 0 {
+        return &quot;{}&quot;
+    }
+    ints := make([]int, 0, len(set.data))
+    for i := range set.data {
+        ints = append(ints, i)
+    }
+    sort.Ints(ints)
+    parts := make([]string, 0, len(ints))
+    for _, i := range ints {
+        parts = append(parts, fmt.Sprint(i))
+    }
+    return &quot;{&quot; + strings.Join(parts, &quot;,&quot;) + &quot;}&quot;
+}
+</code></pre>
+<p>我们如下使用这个数据容器：</p>
+<pre><code>ints := NewIntSet()
+for _, i := range []int{1, 3, 5, 7} {
+    ints.Add(i)
+    fmt.Println(ints)
+}
+for _, i := range []int{1, 2, 3, 4, 5, 6, 7} {
+    fmt.Print(i, ints.Contains(i), &quot; &quot;)
+    ints.Delete(i)
+    fmt.Println(ints)
+}
+</code></pre>
+<p>这个数据容器平淡无奇，我们想给它加一个Undo的功能。我们可以这样来做：</p>
+<pre><code>type UndoableIntSet struct { // Poor style
+    IntSet    // Embedding (delegation)
+    functions []func()
+}
+
+func NewUndoableIntSet() UndoableIntSet {
+    return UndoableIntSet{NewIntSet(), nil}
+}
+
+func (set *UndoableIntSet) Add(x int) { // Override
+    if !set.Contains(x) {
+        set.data[x] = true
+        set.functions = append(set.functions, func() { set.Delete(x) })
+    } else {
+        set.functions = append(set.functions, nil)
+    }
+}
+
+func (set *UndoableIntSet) Delete(x int) { // Override
+    if set.Contains(x) {
+        delete(set.data, x)
+        set.functions = append(set.functions, func() { set.Add(x) })
+    } else {
+        set.functions = append(set.functions, nil)
+    }
+}
+
+func (set *UndoableIntSet) Undo() error {
+    if len(set.functions) == 0 {
+        return errors.New(&quot;No functions to undo&quot;)
+    }
+    index := len(set.functions) - 1
+    if function := set.functions[index]; function != nil {
+        function()
+        set.functions[index] = nil // Free closure for garbage collection
+    }
+    set.functions = set.functions[:index]
+    return nil
+}
+</code></pre>
+<p>于是就可以这样使用了：</p>
+<pre><code>ints := NewUndoableIntSet()
+for _, i := range []int{1, 3, 5, 7} {
+    ints.Add(i)
+    fmt.Println(ints)
+}
+for _, i := range []int{1, 2, 3, 4, 5, 6, 7} {
+    fmt.Println(i, ints.Contains(i), &quot; &quot;)
+    ints.Delete(i)
+    fmt.Println(ints)
+}
+fmt.Println()
+for {
+    if err := ints.Undo(); err != nil {
+        break
+    }
+    fmt.Println(ints)
+}
+</code></pre>
+<p>但是，需要注意的是，我们用了一个新的 <code>UndoableIntSet</code> 几乎重写了所有的 <code>IntSet</code> 和 “写” 相关的方法，这样就可以把操作记录下来，然后 <strong>Undo</strong> 了。</p>
+<p>但是，可能别的类也需要Undo的功能，我是不是要重写所有的需要这个功能的类啊？这样的代码类似，就是因为数据容器不一样，我就要去重写它们，这太二了。</p>
+<p>我们能不能利用前面学到的泛型编程、函数式编程、IoC等范式来把这个事干得好一些呢？当然是可以的。</p>
+<p>如下所示：</p>
+<ul>
+<li>
+<p>我们先声明一个 <code>Undo[]</code> 的函数数组（其实是一个栈）；</p>
+</li>
+<li>
+<p>并实现一个通用 <code>Add()</code>。其需要一个函数指针，并把这个函数指针存放到 <code>Undo[]</code> 函数数组中。</p>
+</li>
+<li>
+<p>在 <code>Undo()</code> 的函数中，我们会遍历<code>Undo[]</code>函数数组，并执行之，执行完后就弹栈。</p>
+</li>
+</ul>
+<pre><code>type Undo []func()
+
+func (undo *Undo) Add(function func()) {
+    *undo = append(*undo, function)
+}
+
+func (undo *Undo) Undo() error {
+    functions := *undo
+    if len(functions) == 0 {
+        return errors.New(&quot;No functions to undo&quot;)
+    }
+    index := len(functions) - 1
+    if function := functions[index]; function != nil {
+        function()
+        functions[index] = nil // Free closure for garbage collection
+    }
+    *undo = functions[:index]
+    return nil
+}
+
+</code></pre>
+<p>那么我们的 <code>IntSet</code> 就可以改写成如下的形式：</p>
+<pre><code>type IntSet struct {
+    data map[int]bool
+    undo Undo
+}
+
+func NewIntSet() IntSet {
+    return IntSet{data: make(map[int]bool)}
+}
+
+</code></pre>
+<p>然后在其中的 <code>Add</code> 和 <code>Delete</code>中实现 Undo 操作。</p>
+<ul>
+<li><code>Add</code> 操作时加入 <code>Delete</code> 操作的 Undo。</li>
+<li><code>Delete</code> 操作时加入 <code>Add</code> 操作的 Undo。</li>
+</ul>
+<pre><code>
+func (set *IntSet) Add(x int) {
+    if !set.Contains(x) {
+        set.data[x] = true
+        set.undo.Add(func() { set.Delete(x) })
+    } else {
+        set.undo.Add(nil)
+    }
+}
+
+func (set *IntSet) Delete(x int) {
+    if set.Contains(x) {
+        delete(set.data, x)
+        set.undo.Add(func() { set.Add(x) })
+    } else {
+        set.undo.Add(nil)
+    }
+}
+
+func (set *IntSet) Undo() error {
+    return set.undo.Undo()
+}
+
+func (set *IntSet) Contains(x int) bool {
+    return set.data[x]
+}
+
+</code></pre>
+<p>我们再次看到，Go语言的Undo接口把Undo的流程给抽象出来，而要怎么Undo的事交给了业务代码来维护（通过注册一个Undo的方法）。这样在Undo的时候，就可以回调这个方法来做与业务相关的Undo操作了。</p>
+<h1>小结</h1>
+<p>这是不是和最一开始的C++的泛型编程很像？也和map、reduce、filter这样的只关心控制流程，不关心业务逻辑的做法很像？而且，一开始用一个UndoableIntSet来包装<code>IntSet</code>类，到反过来在<code>IntSet</code>里依赖<code>Undo</code>类，这就是控制反转IoC。</p>
+<p>以下是《编程范式游记》系列文章的目录，方便你了解这一系列内容的全貌。<strong>这一系列文章中代码量很大，很难用音频体现出来，所以没有录制音频，还望谅解。</strong></p>
+<ul>
+<li><a href="https://time.geekbang.org/column/article/301">01 | 编程范式游记：起源</a></li>
+<li><a href="https://time.geekbang.org/column/article/303">02 | 编程范式游记：泛型编程</a></li>
+<li><a href="https://time.geekbang.org/column/article/2017">03 | 编程范式游记：类型系统和泛型的本质</a></li>
+<li><a href="https://time.geekbang.org/column/article/2711">04 | 编程范式游记：函数式编程</a></li>
+<li><a href="https://time.geekbang.org/column/article/2723">05 | 编程范式游记：修饰器模式</a></li>
+<li><a href="https://time.geekbang.org/column/article/2729">06 | 编程范式游记：面向对象编程</a></li>
+<li><a href="https://time.geekbang.org/column/article/2741">07 | 编程范式游记：基于原型的编程范式</a></li>
+<li><a href="https://time.geekbang.org/column/article/2748">08 | 编程范式游记：Go 语言的委托模式</a></li>
+<li><a href="https://time.geekbang.org/column/article/2751">09 | 编程范式游记：编程的本质</a></li>
+<li><a href="https://time.geekbang.org/column/article/2752">10 | 编程范式游记：逻辑编程范式</a></li>
+<li><a href="https://time.geekbang.org/column/article/2754">11 | 编程范式游记：程序世界里的编程范式</a></li>
+</ul>

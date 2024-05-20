@@ -1,0 +1,70 @@
+<p>你好，我是蒋德钧。今天这节课，我们来继续解答第25讲到32讲的课后思考题。</p><p>今天讲解的这些思考题，主要是围绕哨兵命令实现、Redis Cluster实现，以及常用开发技巧提出来的。你可以根据这些思考题的解答思路，进一步了解下哨兵实例命令和普通实例命令的区别、Redis Cluster对事务执行的支持情况，以及函数式编程方法在Redis测试中的应用等内容。</p><h2><a href="https://time.geekbang.org/column/article/422627">第25讲</a></h2><p><strong>问题：</strong>如果我们在哨兵实例上执行publish命令，那么，这条命令是不是就是由pubsub.c文件中的publishCommand函数来处理的呢?</p><p>这道题目主要是希望你能了解，哨兵实例会使用到哨兵自身实现的命令，而不是普通Redis实例使用的命令。这一点我们从哨兵初始化的过程中就可以看到。</p><p>哨兵初始化时，会调用 <strong>initSentinel函数</strong>。而initSentinel函数会先把server.commands对应的命令表清空，然后执行一个循环，把哨兵自身的命令添加到命令表中。哨兵自身的命令是使用 <strong>sentinelcmds数组</strong>保存的。</p><p>那么从sentinelcmds数组中，我们可以看到publish命令对应的实现函数，其实是 <strong>sentinelPublishCommand</strong>。所以，我们在哨兵实例上执行publish命令，执行的并不是pubsub.c文件中的publishCommand函数。</p><!-- [[[read_end]]] --><p>下面的代码展示了initSentinel 函数先清空、再填充命令表的基本过程，以及sentinelcmds数组的部分内容，你可以看下。</p><pre><code class="language-plain">void initSentinel(void) {
+&nbsp;&nbsp;&nbsp; ...
+&nbsp;&nbsp;&nbsp; dictEmpty(server.commands,NULL);&nbsp; //清空现有的命令表
+&nbsp;&nbsp;&nbsp; // 将sentinelcmds数组中的命令添加到命令表中
+&nbsp;&nbsp;&nbsp; for (j = 0; j &lt; sizeof(sentinelcmds)/sizeof(sentinelcmds[0]); j++) {
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; int retval;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; struct redisCommand *cmd = sentinelcmds+j;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; retval = dictAdd(server.commands, sdsnew(cmd-&gt;name), cmd);
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;…
+&nbsp;&nbsp;&nbsp; }
+&nbsp;&nbsp;&nbsp; ...}
+&nbsp;
+//sentinelcmds数组的部分命令定义
+struct redisCommand sentinelcmds[] = {
+&nbsp;&nbsp;&nbsp; ...
+&nbsp;&nbsp;&nbsp; {"subscribe",subscribeCommand,-2,"",0,NULL,0,0,0,0,0},
+&nbsp;&nbsp;&nbsp; {"publish",sentinelPublishCommand,3,"",0,NULL,0,0,0,0,0}, //publish命令对应哨兵自身实现的sentinelPublishCommand函数
+&nbsp;&nbsp;&nbsp; {"info",sentinelInfoCommand,-1,"",0,NULL,0,0,0,0,0},
+&nbsp;&nbsp;&nbsp; ...
+};
+</code></pre><h2><a href="https://time.geekbang.org/column/article/424827">第26讲</a></h2><p><strong>问题：</strong>在今天课程介绍的源码中，你知道为什么clusterSendPing函数计算wanted值时，是用的集群节点个数的十分之一吗？</p><p>Redis Cluster在使用clusterSendPing函数，检测其他节点的运行状态时，<strong>既需要及时获得节点状态，又不能给集群的正常运行带来过大的额外通信负担。</strong></p><p>因此，clusterSendPing函数发送的Ping消息，其中包含的节点个数不能过多，否则会导致Ping消息体较大，给集群通信带来额外的负担，影响正常的请求通信。而如果Ping消息包含的节点个数过少，又会导致节点无法及时获知较多其他节点的状态。</p><p>所以，wanted默认设置为集群节点个数的十分之一，主要是为了避免上述两种情况的发生。</p><h2><a href="https://time.geekbang.org/column/article/425404">第27讲</a></h2><p><strong>问题：</strong>processCommand函数在调用完getNodeByQuery函数后，实际调用clusterRedirectClient函数进行请求重定向前，会根据当前命令是否是EXEC，分别调用discardTransaction和flagTransaction两个函数。</p><p>那么，你能通过阅读源码，知道这里调用discardTransaction和flagTransaction的目的是什么吗?</p><pre><code class="language-plain">int processCommand(client *c) {
+…
+clusterNode *n = getNodeByQuery(c,c-&gt;cmd,c-&gt;argv,c-&gt;argc,
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &amp;hashslot,&amp;error_code);
+if (n == NULL || n != server.cluster-&gt;myself) {
+&nbsp;&nbsp; if (c-&gt;cmd-&gt;proc == execCommand) {
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; discardTransaction(c);
+&nbsp;&nbsp; } else {
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; flagTransaction (c);
+&nbsp;&nbsp; }
+&nbsp;&nbsp; clusterRedirectClient(c,n,hashslot,error_code);
+&nbsp;&nbsp; return C_OK;
+	}
+	…
+	}
+</code></pre><p>这道题目，像@Kaito、@曾轼麟等同学都给了较为详细的解释，我完善了下他们的答案，分享给你。</p><p>首先你要知道，当Redis Cluster运行时，它并不支持跨节点的事务执行。那么，我们从题目中的代码中可以看到，当getNodeByQuery函数返回null结果，或者查询的key不在当前实例时，discardTransaction或flagTransaction函数会被调用。</p><p>这里你要<strong>注意</strong>，getNodeByQuery函数返回null结果，通常是表示集群不可用、key找不到对应的slot、操作的key不在同一个 slot中、key正在迁移等这些情况。</p><p>那么，当这些情况发生，或者是查询的key不在当前实例时，如果client执行的是EXEC命令，<strong>discardTransaction函数</strong>就会被调用，它会放弃事务的执行，清空当前client之前缓存的命令，并对事务中的key执行unWatch操作，最后重置client的事务标记。</p><p></p><p>而如果当前client执行的是事务中的普通命令，那么 <strong>flagTransaction函数</strong>会被调用。它会给当前client设置标记CLIENT_DIRTY_EXEC。这样一来，当client后续执行EXEC命令时，就会根据这个标记，放弃事务执行。</p><p></p><p>总结来说，就是当集群不可用、key找不到对应的slot、key不在当前实例中、操作的key不在同一个slot中，或者key正在迁移等这几种情况发生时，事务的执行都会被放弃。</p><h2><a href="https://time.geekbang.org/column/article/426420">第28讲</a></h2><p><strong>问题：</strong>在维护Redis Cluster集群状态的数据结构clusterState中，有一个字典树slots_to_keys。当在数据库中插入key时它会被更新，你能在Redis源码文件db.c中，找到更新slots_to_keys字典树的相关函数调用吗？</p><p></p><p>这道题目也有不少同学给出了正确答案，我来给你总结下。</p><p>首先，<strong>dbAdd函数是用来将键值对插入数据库中的</strong>。如果Redis Cluster被启用了，那么dbAdd函数会调用slotToKeyAdd函数，而slotToKeyAdd函数会调用slotToKeyUpdateKey函数。</p><p>那么在slotToKeyUpdateKey函数中，它会调用raxInsert函数更新slots_to_keys，调用链如下所示：</p><blockquote>
+<p>dbAdd -&gt; slotToKeyAdd -&gt; slotToKeyUpdateKey -&gt; raxInsert</p>
+</blockquote><p></p><p>然后，<strong>dbAsyncDelete和dbSyncDelete是用来删除键值对的</strong>。如果Redis Cluster被启用了，这两个函数都会调用slotToKeyUpdateKey函数。而在slotToKeyUpdateKey函数里，它会调用raxRemove函数更新slots_to_keys，调用链如下所示：</p><blockquote>
+<p>dbAsyncDelete/dbSyncDelete -&gt; slotToKeyDel -&gt; slotToKeyUpdateKey -&gt; raxRemove</p>
+</blockquote><p></p><p>另外，<strong>empytDb函数是用来清空数据库的</strong>。它会调用slotToKeyFlush函数，并由slotToKeyFlush函数，调用raxFree函数更新slots_to_keys，调用链如下所示：</p><blockquote>
+<p>empytDb -&gt; slotToKeyFlush -&gt; raxFree</p>
+</blockquote><p></p><p>还有在 <strong>getKeysInSlot函数</strong>中，它会调用raxStart获得slots_to_keys的迭代器，进而查询指定slot中的keys。而在 <strong>delKeysInSlot函数</strong>中，它也会调用raxStart获得slots_to_keys的迭代器，并删除指定slot中的keys。</p><p></p><p>此外，@曾轼麟同学还通过查阅Redis源码的git历史提交记录，发现slots_to_keys原先是使用跳表实现的，后来才替换成字典树。而这一替换的目的，也主要是为了方便通过slot快速查找到slot中的keys。</p><h2><a href="https://time.geekbang.org/column/article/427126">第29讲</a></h2><p><strong>问题：</strong>在addReplyReplicationBacklog函数中，它会计算从节点在全局范围内要跳过的数据长度，如下所示：</p><pre><code class="language-plain">skip = offset - server.repl_backlog_off;
+</code></pre><p>然后，它会根据这个跳过长度计算实际要读取的数据长度，如下所示：</p><pre><code class="language-plain">len = server.repl_backlog_histlen - skip;
+</code></pre><p>请你阅读addReplyReplicationBacklog函数和调用它的masterTryPartialResynchronization函数，你觉得这里的skip会大于repl_backlog_histlen吗？</p><p>其实，在masterTryPartialResynchronization函数中，从节点要读取的全局位置对应了变量psync_offset，这个函数会比较psync_offset是否小于repl_backlog_off，以及psync_offset是否大于repl_backlog_off加上repl_backlog_histlen的和。</p><p>当这两种情况发生时，masterTryPartialResynchronization函数会进行<strong>全量复制</strong>，如下所示：</p><pre><code class="language-plain">int masterTryPartialResynchronization(client *c) {
+…
+// psync_offset小于repl_backlog_off时，或者psync_offset 大于repl_backlog_off加repl_backlog_histlen的和时
+if (!server.repl_backlog ||
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; psync_offset &lt; server.repl_backlog_off ||
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; psync_offset &gt; (server.repl_backlog_off + server.repl_backlog_histlen)) {&nbsp;
+&nbsp;&nbsp; …
+&nbsp;&nbsp; goto need_full_resync;&nbsp; //进行全量复制
+}
+</code></pre><p>当psync_offset大于repl_backlog_off，并且小于repl_backlog_off加上repl_backlog_histlen的和，此时，masterTryPartialResynchronization函数会调用addReplyReplicationBacklog函数，进行<strong>增量复制</strong>。</p><p>而psync_offset会作为参数offset，传给addReplyReplicationBacklog函数。因此，在addReplyReplicationBacklog函数中计算skip时，就不会发生skip会大于repl_backlog_histlen的情况了，这种情况已经在masterTryPartialResynchronization函数中处理了。</p><h2><a href="https://time.geekbang.org/column/article/427537">第30讲</a></h2><p><strong>问题：</strong>Redis在命令执行的call函数中，为什么不会针对EXEC命令，调用slowlogPushEntryIfNeeded函数来记录慢命令呢？</p><p></p><p>我设计这道题的主要目的，是希望你能理解EXEC命令的使用场景和事务执行的过程。</p><p><strong>EXEC命令是用来执行属于同一个事务的所有命令的</strong>。当程序要执行事务时，会先执行MULTI命令，紧接着，执行的命令并不会立即执行，而是被放到一个队列中缓存起来。等到EXEC命令执行时，在它之前被缓存起来等待执行的事务命令，才会实际执行。</p><p>因此，EXEC命令执行时，实际上会执行多条事务命令。此时，如果调用slowlogPushEntryIfNeeded函数记录了慢命令的话，并不能表示EXEC本身就是一个慢命令。而实际可能会耗时长的命令是事务中的命令，并不是EXEC命令自身，所以，这里不会针对EXEC命令，来调用slowlogPushEntryIfNeeded函数。</p><p></p><h2><a href="https://time.geekbang.org/column/article/428471">第31讲</a></h2><p><strong>问题：</strong>你使用过哪些Redis的扩展模块，或者自行开发过扩展模块吗？欢迎分享一些你的经验。</p><p></p><p>我自己有使用过Redis的 <strong>TimeSeries扩展模块</strong>，用来在一个物联网应用的场景中保存一些时间序列数据。TimeSeries模块的功能特点是可以使用标签来对不同的数据集合进行过滤，通过集合标签筛选应用需要的集合数据。而且这个模块还支持对集合数据做聚合计算，比如直接求最大值、最小值等。</p><p></p><p>此外，我还使用过 <strong>RedisGraph扩展模块</strong>。这个模块支持把图结构的数据保存到Redis中，并充分利用了Redis使用内存读写数据的性能优势，提供对图数据进行快速创建、查询和条件匹配。你要是感兴趣，可以看下RedisGraph的<a href="https://redisgraph.io/">官网</a>。</p><p></p><h2><a href="https://time.geekbang.org/column/article/428474">第32讲</a></h2><p><strong>问题：</strong>Redis源码中还有一个针对SDS的小型测试框架，你知道这个测试框架是在哪个代码文件中吗?</p><p></p><p>这个小型测试框架是在testhelp.h文件中实现的。它定义了一个<strong>宏test_cond</strong>，而这个宏实际是一段测试代码，它的参数包括了测试项描述descr，以及具体的测试函数_c。</p><p></p><p>这里，你需要注意的是，在这个小框架中，测试函数是作为test_cond参数传递的，这体现了函数式编程的思想，而且这种开发方式使用起来也很简洁。</p><p></p><p>下面的代码展示了这个小测试框架的主要部分，你可以看下。</p><pre><code class="language-plain">int __failed_tests = 0;&nbsp; //失败的测试项的数目
+int __test_num = 0;&nbsp;&nbsp;&nbsp; //已测试项的数目
+#define test_cond(descr,_c) do { \
+&nbsp;&nbsp;&nbsp; __test_num++; printf("%d - %s: ", __test_num, descr); \
+&nbsp;&nbsp;&nbsp; if(_c) printf("PASSED\n"); else {printf("FAILED\n"); __failed_tests++;} \&nbsp; //运行测试函数_c，如果能通过，则打印PASSED，否则打印FAILED
+} while(0);
+</code></pre><p>那么，基于这个测试框架，在sds.c文件的sdsTest函数中，我就调用了test_cond宏，对SDS相关的多种操作进行了测试，你可以看看下面的示例代码。</p><pre><code class="language-plain">int sdsTest(void) {
+&nbsp;&nbsp;&nbsp; {
+&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sds x = sdsnew("foo");&nbsp; //调用sdsnew创建一个sds变量x
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; test_cond("Create a string and obtain the length",
+	sdslen(x) == 3 &amp;&amp; memcmp(x,"foo\0",4) == 0)&nbsp; //调用test_cond测试sdsnew是否成功执行
+	&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; …
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; x = sdscat(x,"bar");&nbsp; //调用sdscat向sds变量x追求字符串
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; test_cond("Strings concatenation",
+	sdslen(x) == 5 &amp;&amp; memcmp(x,"fobar\0",6) == 0); //调用test_cond测试sdscat是否成功执行
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; …}
+</code></pre><p></p><h2>小结</h2><p>今天这节课，也是我们最后一节答疑课，希望通过这5节答疑课程，解答了你对咱们课后思考题的疑问。同时也希望，你能通过这些课后思考题，去进一步扩展自己对Redis源码的了解，以及掌握Redis实现中的设计思想。</p><p>当然，如果你在看了答疑后，仍然有疑惑不解的话，也欢迎你在留言区写下你的疑问，我会和你继续探讨。</p><p></p><p></p><p></p>

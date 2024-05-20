@@ -1,0 +1,128 @@
+<p>微服务是分布式系统中最近比较流行的架构模型，也是SOA架构的一个进化。微服务架构并不是银弹，所以，也不要寄希望于微服务架构能够解决所有的问题。微服务架构主要解决的是如何快速地开发和部署我们的服务，这对于一个能够适应快速开发和成长的公司是非常必要的。同时我也觉得，微服务中有很多很不错的想法和理念，所以学习微服务是每一个技术人员迈向卓越的架构师的必经之路。</p><p>首先，你需要看一下，Martin Fowler的这篇关于微服务架构的文档 - <a href="http://martinfowler.com/articles/microservices.html">Microservice Architecture</a> （<a href="https://blog.csdn.net/wurenhai/article/details/37659335">中译版</a>），这篇文章说明了微服务的架构与传统架构的不同之处在于，微服务的每个服务与其数据库都是独立的，可以无依赖地进行部署。你也可以看看Martin Fowler老人家现身说法的<a href="https://www.youtube.com/watch?v=wgdBVIX9ifA">视频</a>。</p><p>另外，你还可以简单地浏览一下，各家对微服务的理解。</p><ul>
+<li><a href="https://aws.amazon.com/microservices/">AWS的理解 - What are Microservices?</a>。</li>
+<li><a href="https://docs.microsoft.com/en-us/azure/architecture/guide/architecture-styles/microservices">Microsoft的理解 - Microservices architecture style</a>。</li>
+<li><a href="https://pivotal.io/microservices">Pivotal的理解 - Microservices</a>。</li>
+</ul><h1>微服务架构</h1><p>接下来，你可以看一下 <a href="https://www.redbooks.ibm.com/redbooks/pdfs/sg248357.pdf">IBM红皮书：Microservices Best Practices for Java</a> ，这本书非常好，不但有通过把Spring Boot和 Dropwizard来架建Java的微服务，而且还谈到了一些标准的架构模型，如服务注册、服务发现、API网关、服务通讯、数据处理、应用安全、测试、部署、运维等，是相当不错的一本书。</p><!-- [[[read_end]]] --><p>当然，有一本书你也可以读一下—— <a href="https://book.douban.com/subject/26772677/">微服务设计</a>。这本书全面介绍了微服务的建模、集成、测试、部署和监控，通过一个虚构的公司讲解了如何建立微服务架构。主要内容包括认识微服务在保证系统设计与组织目标统一上的重要性，学会把服务集成到已有系统中，采用递增手段拆分单块大型应用，通过持续集成部署微服务，等等。</p><p>与此相似的，也有其它的一系列文章，值得一读。</p><p>下面是Nginx上的一组微服务架构的系列文章。</p><ul>
+<li><a href="https://www.nginx.com/blog/introduction-to-microservices/">Introduction to Microservices</a></li>
+<li><a href="https://www.nginx.com/blog/building-microservices-using-an-api-gateway/">Building Microservices: Using an API Gateway</a></li>
+<li><a href="https://www.nginx.com/blog/building-microservices-inter-process-communication/">Building Microservices: Inter-Process Communication in a Microservices Architecture</a></li>
+<li><a href="https://www.nginx.com/blog/service-discovery-in-a-microservices-architecture/">Service Discovery in a Microservices Architecture</a></li>
+<li><a href="https://www.nginx.com/blog/event-driven-data-management-microservices/">Event-Driven Data Management for Microservices</a></li>
+<li><a href="https://www.nginx.com/blog/deploying-microservices/">Choosing a Microservices Deployment Strategy</a></li>
+<li><a href="https://www.nginx.com/blog/refactoring-a-monolith-into-microservices/">Refactoring a Monolith into Microservices</a></li>
+</ul><p>下面这是 <a href="https://auth0.com/blog/">Auto0 Blog</a> 上一系列的微服务的介绍，有代码演示。</p><ul>
+<li><a href="https://auth0.com/blog/an-introduction-to-microservices-part-1/">An Introduction to Microservices, Part 1</a></li>
+<li><a href="https://auth0.com/blog/an-introduction-to-microservices-part-2-API-gateway/">API Gateway. An Introduction to Microservices, Part 2</a></li>
+<li><a href="https://auth0.com/blog/an-introduction-to-microservices-part-3-the-service-registry/">An Introduction to Microservices, Part 3: The Service Registry</a></li>
+<li><a href="https://auth0.com/blog/introduction-to-microservices-part-4-dependencies/">Intro to Microservices, Part 4: Dependencies and Data Sharing</a></li>
+<li><a href="https://auth0.com/blog/apigateway-microservices-superglue/">API Gateway: the Microservices Superglue</a></li>
+</ul><p>还有Dzone的这个Spring Boot的教程。</p><ul>
+<li><a href="https://dzone.com/articles/microservices-with-spring-boot-part-1-getting-star">Microservices With Spring Boot - Part 1 - Getting Started</a></li>
+<li><a href="https://dzone.com/articles/microservices-with-spring-boot-part-2-creating-a-f">Microservices With Spring Boot - Part 2 - Creating a Forex Microservice</a></li>
+<li><a href="https://dzone.com/articles/microservices-with-spring-boot-part-3-creating-cur">Microservices With Spring Boot - Part 3 - Creating Currency Conversion Microservice</a></li>
+<li><a href="https://dzone.com/articles/microservices-with-spring-boot-part-4-using-ribbon">Microservices With Spring Boot - Part 4 - Using Ribbon for Load Balancing</a></li>
+<li><a href="https://dzone.com/articles/microservices-with-spring-boot-part-5-using-eureka">Microservices With Spring Boot - Part 5 - Using Eureka Naming Server</a></li>
+</ul><p>当然，如果你要玩得时髦一些的话，我推荐你使用下面的这套架构。</p><ul>
+<li>
+<p><strong>前端</strong>：<a href="https://reactjs.org/">React.js</a> 或 <a href="https://vuejs.org/">Vue.js</a>。</p>
+</li>
+<li>
+<p><strong>后端</strong>：<a href="https://golang.org/">Go语言</a> + 微服务工具集 <a href="https://gokit.io/">Go kit</a> ，因为是微服务了，所以，每个服务的代码就简单了。既然简单了，也就可以用任何语言了，所以，我推荐Go语言。</p>
+</li>
+<li>
+<p><strong>通讯</strong>：<a href="https://grpc.io/">gRPC</a>，这是Google远程调用的一个框架，它比Restful的调用要快20倍到50倍的样子。</p>
+</li>
+<li>
+<p><strong>API</strong>：<a href="https://swagger.io/">Swagger</a> ，Swagger是一种Restful API的简单但强大的表示方式，标准的，语言无关，这种表示方式不但人可读，而且机器可读。可以作为Restful API的交互式文档，也可以作为Restful API形式化的接口描述，生成客户端和服务端的代码。今天，所有的API应该都通过Swagger来完成。</p>
+</li>
+<li>
+<p><strong>网关</strong>：<a href="https://envoyproxy.github.io/">Envoy</a> 其包含了服务发现、负载均衡和熔断等这些特性，也是一个很有潜力的网关。当然，Kubernetes也是很好的，而且它也是高扩展的，所以，完全可以把Envoy通过Ingress集成进Kubernetes。这里有一个开源项目就是干这个事的 - <a href="https://github.com/heptio/contour">contour</a>。</p>
+</li>
+<li>
+<p><strong>日志监控</strong>：<a href="https://www.fluentd.org/">fluentd</a> + <a href="https://www.elastic.co/webinars/introduction-elk-stack">ELK</a> 。</p>
+</li>
+<li>
+<p><strong>指标监控</strong>：<a href="https://prometheus.io/">Prometheus</a> 。</p>
+</li>
+<li>
+<p><strong>调用跟踪</strong>：<a href="http://jaeger.readthedocs.io/en/latest/">Jaeger</a> 或是 <a href="http://zipkin.io/">Zipkin</a>，当然，后者比较传统一些，前者比较时髦，最重要的是，其可以和Prometheus和Envory集成。</p>
+</li>
+<li>
+<p><strong>自动化运维</strong>：<a href="https://docker.io/">Docker</a> + <a href="https://kubernetes.io/">Kubernetes</a> 。</p>
+</li>
+</ul><h1>微服务和SOA</h1><p>在对微服务有了一定的认识以后，一定有很多同学分不清楚微服务和SOA架构，对此，你可以看一下这本电子书 - 《<a href="https://www.nginx.com/resources/library/microservices-vs-soa/">Microservices vs. Service-Oriented Architecture</a>》。通过这本书，你可以学到，服务化架构的一些事实，还有基础的SOA和微服务的架构知识，以及两种架构的不同。这本书的作者马克·理查兹（Mark Richards）同学拥有十年以上的SOA和微服务架构的设计和实现的经验。</p><p>另外，还有几篇其它对比SOA和微服务的文章你也可以看看。</p><ul>
+<li><a href="https://dzone.com/articles/microservices-vs-soa-2">DZone: Microservices vs. SOA</a></li>
+<li><a href="https://dzone.com/articles/microservices-vs-soa-is-there-any-difference-at-al">DZone: Microservices vs. SOA - Is There Any Difference at All?</a></li>
+<li><a href="https://www.ibm.com/developerworks/websphere/library/techarticles/1601_clark-trs/1601_clark.html">Microservices, SOA, and APIs: Friends or enemies?</a></li>
+</ul><p>除此之外，我们还需要知道微服务和其它架构的一些不同和比较，这样我们就可以了解微服务架构的优缺点。下面几篇文章将帮助获得这些知识。</p><ul>
+<li><a href="http://blog.altoros.com/microservices-architectures-paas-vs-iaas-top-6-differences.html">PaaS vs. IaaS for Microservices Architectures: Top 6 Differences</a></li>
+<li><a href="https://www.slideshare.net/altoros/microservices-vs-monolithic-architectures-pros-and-cons">Microservices vs. Monolithic Architectures: Pros, Cons, and How Cloud Foundry (PaaS) Can Help</a></li>
+<li><a href="http://highscalability.com/blog/2014/4/8/microservices-not-a-free-lunch.html">Microservices - Not A Free Lunch!</a></li>
+<li><a href="https://www.stackbuilders.com/news/the-hidden-costs-of-microservices">The Hidden Costs Of Microservices</a></li>
+</ul><h1>设计模式和最佳实践</h1><p>然后，你可以看一下微服务的一些设计模式。</p><ul>
+<li>
+<p><a href="http://microservices.io/">Microservice Patterns</a>，微服务架构的设计模式和最佳实践。</p>
+</li>
+<li>
+<p><a href="https://www.oreilly.com/ideas/microservices-antipatterns-and-pitfalls">Microservice Antipatterns and Pitfalls</a>，微服务架构的一些已知的反模式和陷阱。</p>
+</li>
+<li>
+<p><a href="https://codingsans.com/blog/microservice-architecture-best-practices">Microservice Architecture: All The Best Practices You Need To Know</a>，这是一篇长文，里面讲述了什么是微服务、微服务架构的优缺点、微服务最大的挑战和解决方案是什么、如何避免出错，以及构建微服务架构的最佳实践等多方面的内容。推荐阅读。</p>
+</li>
+<li>
+<p><a href="https://www.vinaysahni.com/best-practices-for-building-a-microservice-architecture">Best Practices for Building a Microservice Architecture</a> ，这篇文章分享了构建微服务架构的最佳实践。</p>
+</li>
+<li>
+<p><a href="https://jobs.zalando.com/tech/blog/simplicity-by-distributing-complexity/">Simplicity by Distributing Complexity</a>，这是一篇讲如何使用事件驱动构建微服务架构的文章，其中有很多不错的设计上的基本原则。</p>
+</li>
+</ul><h1>相关资源</h1><ul>
+<li>
+<p><a href="http://martinfowler.com/microservices/">Microservices Resource Guide</a> ，这个网页上是Martin Fowler为我们挑选的和微服务相关的文章、视频、书或是podcast。</p>
+</li>
+<li>
+<p><a href="https://github.com/mfornos/awesome-microservices/">Awesome Microservices</a> ，一个各种微服务资源和相关项目的集中地。</p>
+</li>
+</ul><h1>小结</h1><p>好了，总结一下今天的内容。我认为，微服务中有很多很不错的想法和理念，所以学习微服务是每一个技术人员迈向卓越的架构师的必经之路。在这篇文章中，我先给出了AWS、Microsoft和Pivotal对微服务的理解；然后给出了好几个系列的教程，帮你全面学习和理解微服务架构；然后通过一系列文章帮你来区分何为微服务，何为SOA；最后给出了微服务架构的设计模式和最佳实践，以及相关资源。相信通过这一系列内容的学习，你一定会对微服务有全面、透彻的理解。</p><p>下篇文章，我们将讲述的容器化和自动化运维方面的内容。敬请期待。</p><p>下面是《程序员练级攻略》系列文章的目录。</p><ul>
+<li><a href="https://time.geekbang.org/column/article/8136">开篇词</a></li>
+<li>入门篇
+<ul>
+<li><a href="https://time.geekbang.org/column/article/8216">零基础启蒙</a></li>
+<li><a href="https://time.geekbang.org/column/article/8217">正式入门</a></li>
+</ul>
+</li>
+<li>修养篇
+<ul>
+<li><a href="https://time.geekbang.org/column/article/8700">程序员修养</a></li>
+</ul>
+</li>
+<li>专业基础篇
+<ul>
+<li><a href="https://time.geekbang.org/column/article/8701">编程语言</a></li>
+<li><a href="https://time.geekbang.org/column/article/8887">理论学科</a></li>
+<li><a href="https://time.geekbang.org/column/article/8888">系统知识</a></li>
+</ul>
+</li>
+<li>软件设计篇
+<ul>
+<li><a href="https://time.geekbang.org/column/article/9369">软件设计</a></li>
+</ul>
+</li>
+<li>高手成长篇
+<ul>
+<li><a href="https://time.geekbang.org/column/article/9759">Linux系统、内存和网络（系统底层知识）</a></li>
+<li><a href="https://time.geekbang.org/column/article/9851">异步I/O模型和Lock-Free编程（系统底层知识）</a></li>
+<li><a href="https://time.geekbang.org/column/article/10216">Java底层知识</a></li>
+<li><a href="https://time.geekbang.org/column/article/10301">数据库</a></li>
+<li><a href="https://time.geekbang.org/column/article/10603">分布式架构入门（分布式架构）</a></li>
+<li><a href="https://time.geekbang.org/column/article/10604">分布式架构经典图书和论文（分布式架构）</a></li>
+<li><a href="https://time.geekbang.org/column/article/11232">分布式架构工程设计(分布式架构)</a></li>
+<li><a href="https://time.geekbang.org/column/article/11116">微服务</a></li>
+<li><a href="https://time.geekbang.org/column/article/11665">容器化和自动化运维</a></li>
+<li><a href="https://time.geekbang.org/column/article/11669">机器学习和人工智能</a></li>
+<li><a href="https://time.geekbang.org/column/article/12271">前端基础和底层原理（前端方向）</a></li>
+<li><a href="https://time.geekbang.org/column/article/12389">前端性能优化和框架（前端方向）</a></li>
+<li><a href="https://time.geekbang.org/column/article/12486">UI/UX设计（前端方向）</a></li>
+<li><a href="https://time.geekbang.org/column/article/12561">技术资源集散地</a></li>
+</ul>
+</li>
+</ul><p></p>

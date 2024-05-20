@@ -1,0 +1,848 @@
+<p>你好，我是高楼。</p><p>在上一讲，我给你梳理了链路追踪的背景、目标、几种常见的组件，我们还确定了系统最后的选型方案。</p><p>在这一讲，我会通过案例演示在应用  Sleuth+Zipkin  来追踪我们电商微服务项目请求的过程中，需要关注的一些技术细节。</p><p>首先，我们来回顾一下电商项目集成 Sleuth+ Zipkin 的应用架构。​<img src="https://static001.geekbang.org/resource/image/5a/56/5a92b6d7266a4b9b335d79be0d05cd56.jpg?wh=1920x1210" alt="图片"></p><p>系统涉及的需要新增或改造的服务与组件包含以下 10 个：</p><ol>
+<li>Zipkin，链路追踪系统</li>
+<li>Kafka，消息队列</li>
+<li>ElasticSearch，搜索引擎</li>
+<li>mall-gateway，API 网关</li>
+<li>mall-auth，认证中心服务</li>
+<li>mall-member，会员系统服务</li>
+<li>mall-order，订单系统服务</li>
+<li>mall-cart，购物车系统服务</li>
+<li>mall-protal，商城后台系统服务</li>
+<li>mall-admin，后台管理系统服务</li>
+</ol><p>结合技术栈，可以得出下面这张表格。表格整合了涉及追踪的技术组件，可以指导我们后续的改造工作。</p><p><img src="https://static001.geekbang.org/resource/image/22/1b/22d025a14dce6134a14a578c790a681b.jpg?wh=1920x1080" alt="图片"></p><p>接下来，我们通过 Demo 预演来一一做一下组件追踪的技术验证工作。</p><h2>demo 预演</h2><h3>SpringMVC、Fegin、Logback</h3><p>一般而言，我们使用 <a href="https://github.com/openzipkin/brave">Brave</a> 库，作为 Zipkin 客户端。同时它的 <a href="https://github.com/openzipkin/brave/tree/master/instrumentation">instrumentation</a> 子项目，已经提供了 SpringMVC、Fegin 等组件的链路追踪功能。</p><!-- [[[read_end]]] --><p>所以通过引入 Spring Cloud Sleuth + Zipkin 相关依赖，可以实现对它们的自动配置，从而实现链路追踪的功能。</p><pre><code class="language-xml">   &lt;!--添加 Sleuth 依赖 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-sleuth&lt;/artifactId&gt;
+            &lt;version&gt;2.2.6.RELEASE&lt;/version&gt;
+        &lt;/dependency&gt;
+        &lt;!--Zipkin 客户端--&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-zipkin&lt;/artifactId&gt;
+            &lt;version&gt;2.2.6.RELEASE&lt;/version&gt;
+        &lt;/dependency&gt;
+</code></pre><p>从我给出的截图可以看出，已经成功引入 Zipkin、Sleuth 和 Brave 相关的依赖。</p><p><img src="https://static001.geekbang.org/resource/image/3f/cd/3f95c3d14cf9288bab3e72a6a7e96bcd.png?wh=732x794" alt="图片"></p><p><img src="https://static001.geekbang.org/resource/image/2a/ec/2ac1eb0abd845b44d24acd528eb7b8ec.png?wh=720x794" alt="图片"></p><p>具体的示例，你可以参考这篇文章： <a href="https://mp.weixin.qq.com/s/7Xqk_1xGlLZom9hkfyW9hg">Sleuth+Zipkin 实现 Spring Cloud 链路追踪</a> ​。</p><p>最后，Zipkin 可视化 UI 会出现对应的链路调用图及详细的链路。</p><p><img src="https://static001.geekbang.org/resource/image/64/b9/64436fd08e6f241215f2a1205b32c7b9.png?wh=1912x996" alt="图片"></p><h3>Spring Cloud Gateway</h3><p>因为 <a href="https://github.com/openzipkin/brave">Brave</a> 库默认提供了 Gateway 链路追踪的功能，所以要想实现 Sleuth 对 <a href="https://spring.io/projects/spring-cloud-gateway">Spring Cloud Gateway</a> 的代理请求的链路追踪，我们只需要集成就可以了。</p><p>这里我们结合上面示例中的三个服务，实现一个 API 网关，转发请求到 A 服务，即 Gateway -&gt; A -&gt; B -&gt; C，各服务间通过 Fegin 实现远程调用。</p><p>注意，Spring Cloud Gateway 是基于 <a href="https://docs.spring.io/spring-framework/docs/current/reference/html/web-reactive.html">WebFlux</a> 实现的，而 Spring Cloud Sleuth 的 <a href="https://github.com/spring-cloud/spring-cloud-sleuth/blob/master/spring-cloud-sleuth-core/src/main/java/org/springframework/cloud/sleuth/instrument/web/">instrument/web</a> 模块提供的插件，实际是针对 WebFlux 框架，同样也适用于 Spring Cloud Gateway。</p><p>具体操作如下：</p><p>第一步，创建 pom.xml 文件，引入相关依赖。</p><pre><code class="language-xml">&lt;dependencies&gt;
+        &lt;!-- 引入 Spring Cloud Gateway 相关依赖，使用它作为网关，并实现对其的自动配置 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-gateway&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!-- 引入 Zipkin 依赖--&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-zipkin&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!--添加 Sleuth 依赖 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-sleuth&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+    &lt;/dependencies&gt;
+</code></pre><p>​第二步，在 application.yml 中，添加服务路由相关配置。</p><pre><code class="language-yaml">server:
+  port: 8888
+
+spring:
+  application:
+    name: demo-gateway-application
+  sleuth:
+    sampler: #采样器
+      probability: 1.0 #采样率，采样率是采集 Trace 的比率，默认 0.1
+      rate: 10000 #每秒数据采集量，最多 n 条/秒 Trace
+    web:  # Web 组件的配置项，例如说 SpringMVC
+      enabled: true
+  zipkin: #设置 zipkin 服务端地址
+    base-url: http://127.0.0.1:9411
+
+  cloud:
+    # Spring Cloud Gateway 配置项，对应 GatewayProperties 类
+    gateway:
+      # 路由配置项，对应 RouteDefinition 数组
+      routes:
+        - id: feign-service-route
+          uri: http://127.0.0.1:7000
+          predicates:
+            - Path=/**
+</code></pre><p>因为使用的是 <a href="https://github.com/spring-cloud/spring-cloud-sleuth/blob/master/spring-cloud-sleuth-core/src/main/java/org/springframework/cloud/sleuth/instrument/web/">instrument/web</a> 模块提供的插件，所以和 SpringMVC 一样，WebFlux 也是使用 spring.sleuth.web 配置项。</p><p>配置项中，我们创建了一个编号为 feign-service-route 的路由，转发到 a-service 服务。</p><p>第三步，网关启动类。</p><pre><code class="language-java">package com.dunshan.gatewaydemo;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+/**
+ * @author dunshan
+ */
+@SpringBootApplication
+public class GatewayApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(GatewayApplication.class, args);
+    }
+}
+</code></pre><p>最后启动所有应用，我们使用 Postman 测试一下接口，执行一次请求操作，尝试追踪该链路。</p><p><img src="https://static001.geekbang.org/resource/image/f2/6d/f261dec214449e92fcd8a98277ba906d.png?wh=1920x1125" alt="图片"></p><p>在 Zipkin 可视化 UI 就可以看到刚才我们调用接口的链路数据了。</p><p><img src="https://static001.geekbang.org/resource/image/0a/81/0a8f9035f47e868f75f0804cd1c41b81.png?wh=1912x583" alt="图片"></p><p>这条链路经过 gateway、a-service、b-service、c-service 四个服务。</p><p>我们点开该链路，可以看到一个 Trace 明细。</p><p><img src="https://static001.geekbang.org/resource/image/57/8e/57fde9b813b3276a96ca23cf2edeyy8e.png?wh=1917x969" alt="图片"></p><h3>MySQL</h3><p>这里需要实现一个简单的 MySQL 查询，接下来我会使用 MySQL8 驱动进行数据库的操作，这也是我们项目目前采用的方式。</p><p>目前 Brave 支持通过三种插件实现 MySQL 链路数据收集，它们分别是：</p><ul>
+<li><a href="https://github.com/openzipkin/brave/tree/master/instrumentation/mysql">brave-instrumentation-mysql</a></li>
+<li><a href="https://github.com/openzipkin/brave/blob/master/instrumentation/mysql6/">brave-instrumentation-mysql6</a></li>
+<li><a href="https://github.com/openzipkin/brave/blob/master/instrumentation/mysql8/">brave-instrumentation-mysql8</a></li>
+</ul><p>我简单演示一下用 Spring JDBC Template 的方式进行 MySQL 操作的步骤。</p><p>第一步，创建 pom.xml 文件，引入相关依赖。</p><pre><code class="language-xml">  &lt;dependencies&gt;
+        &lt;!-- 引入 SpringMVC 相关依赖，并实现对其的自动配置 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!-- 实现对数据库连接池的自动化配置 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-boot-starter-jdbc&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!--Mysql 数据库驱动--&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;mysql&lt;/groupId&gt;
+            &lt;artifactId&gt;mysql-connector-java&lt;/artifactId&gt;
+            &lt;version&gt;8.0.15&lt;/version&gt;
+        &lt;/dependency&gt;
+        &lt;!-- 引入 Zipkin 依赖--&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-zipkin&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!--添加 Sleuth 依赖 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-sleuth&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!-- Brave 对 MySQL8 的支持 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;io.zipkin.brave&lt;/groupId&gt;
+            &lt;artifactId&gt;brave-instrumentation-mysql8&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+    &lt;/dependencies&gt;
+</code></pre><p>这里引入 brave-instrumentation-mysql8 依赖，实现对 MySQL 的链路追踪。</p><p>第二步，在 application.yml 中，添加数据库相关配置。</p><pre><code class="language-yaml">spring:
+  application:
+    name: demo-service # 服务名
+  sleuth:
+    sampler: #采样器
+      probability: 1.0 #采样率，采样率是采集 Trace 的比率，默认 0.1
+      rate: 10000 #每秒数据采集量，最多 n 条/秒 Trace
+    web:  # Web 组件的配置项，例如说 SpringMVC
+      enabled: true
+  zipkin: #设置 zipkin 服务端地址
+    base-url: http://127.0.0.1:9411
+
+  # datasource 数据源配置内容
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/test?useSSL=false&amp;useUnicode=true&amp;characterEncoding=UTF-8&amp;queryInterceptors=brave.mysql8.TracingQueryInterceptor&amp;exceptionInterceptors=brave.mysql8.TracingExceptionInterceptor&amp;zipkinServiceName=mysql-demo
+    driver-class-name: com.mysql.jdbc.Driver
+    username: root
+    password: root
+
+logging:
+  level:
+    root: debug #为演示需要，开启 debug 级别日志
+</code></pre><p>在这里，Brave 通过实现类 <a href="https://github.com/openzipkin/brave/blob/master/instrumentation/mysql8/src/main/java/brave/mysql8/TracingQueryInterceptor.java">TracingQueryInterceptor</a> 拦截 SQL 请求，进行 MySQL 的链路追踪。切记，在 spring.datasource.url 配置项上的 queryInterceptors、exceptionInterceptors 和 zipkinServiceName 属性上，一定要分别设置拦截器和该 MySQL 在 Zipkin 中展示的服务名。</p><p>第三步，在 MySQL 数据库中，创建用户表并插入数据。</p><pre><code class="language-sql">CREATE TABLE `t_user` (
+  `id` int(8) NOT NULL AUTO_INCREMENT COMMENT '主键自增',
+  `username` varchar(50) NOT NULL COMMENT '用户名',
+  `password` varchar(50) NOT NULL COMMENT '密码',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COMMENT='用户表';
+
+INSERT INTO `t_user`(`id`, `username`, `password`) VALUES (1, '7d', '123456');
+
+</code></pre><p>​第四步，创建 DemoController 类，提供示例 API 接口。</p><pre><code class="language-java">package com.dunshan.mysql8demo.controller;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.BeanPropertyRowMapper;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/7d")
+public class DemoController {
+    @Autowired
+    private JdbcTemplate template;
+    @GetMapping("/get")
+    public String get(@RequestParam("id") Integer id) {
+        this.selectById(1);
+        return "success";
+    }
+    public Object selectById(Integer id) {
+        return template.queryForObject("SELECT id, username, password FROM t_user WHERE id = ?",
+                new BeanPropertyRowMapper&lt;&gt;(Object.class), // 结果转换成对应的对象。
+                id);
+    }
+}
+</code></pre><p>第五步，创建 DemoServiceApplication 启动类。</p><pre><code class="language-java">package com.dunshan.mysql8demo;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class DemoServiceApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(DemoServiceApplication.class, args);
+    }
+}
+</code></pre><p>这样在 /7d/get 接口会执行一次 MySQL 的查询操作。<br>
+最后启动应用，我们使用 Postman 测试一下接口，尝试追踪该链路。</p><p><img src="https://static001.geekbang.org/resource/image/2f/52/2fdb79acbbe86076a9eeb542f8905e52.png?wh=1920x1398" alt="图片"></p><p>同样在 Zipkin 可视化 UI 也可以看到刚才调用接口的链路数据。</p><p><img src="https://static001.geekbang.org/resource/image/0f/c8/0f8ce28181143847aef94b64397bb0c8.png?wh=1916x996" alt="图片"></p><p>点开这个链路，可以看到一个 Trace 明细。</p><p><img src="https://static001.geekbang.org/resource/image/33/a7/33afd454a0f38fe5yy66f0fdb52b37a7.png?wh=1915x996" alt="图片"></p><p>到这里，我们的 MySQL 组件链路追踪就成功了。</p><h3>Redis</h3><p>这一部分需要实现简单的 Redis 操作，接下来我们使用 Spring Data Redis + Jedis 进行 Redis 的操作（项目部分服务使用的方式）。目前 Brave 暂未支持 Jedis 客户端的方式，所以我们只能考虑其它的办法。</p><p>在 <a href="https://github.com/opentracing">opentracing-contrib</a> 项目中，有一个 <a href="https://github.com/opentracing-contrib/java-redis-client">java-redis-client</a> 子项目，提供了 OpenTracing 针对 Jedis、Lettuce 等客户端的链路追踪功能。这样，我们搭配上 <a href="https://github.com/openzipkin-contrib/brave-opentracing">brave-opentracing</a> 项目，可以使用 OpenTracing API 收集的链路数据，发送给 Zipkin。</p><p>而 Lettuce 基于 Brave 实现了 <a href="https://github.com/lettuce-io/lettuce-core/blob/main/src/main/java/io/lettuce/core/tracing/BraveTracing.java">BraveTracing</a> ，从而可以实现对 Redis 操作的链路追踪。并且，Spring Cloud Sleuth 的 <a href="https://github.com/spring-cloud/spring-cloud-sleuth/tree/main/spring-cloud-sleuth-autoconfigure/src/main/java/org/springframework/cloud/sleuth/autoconfig/instrument/redis">instrument/redis</a> 模块对它实现了自动配置。如果项目中是使用 Lettuce 作为 Redis 客户端的话，可以考虑采用这种方式。</p><p>我们还是来看下具体的操作步骤。</p><p>第一步，创建 pom.xml 文件，引入相关依赖。</p><pre><code class="language-xml">   &lt;dependencies&gt;
+        &lt;!-- 引入 SpringMVC 相关依赖，并实现对其的自动配置 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!-- 实现对 Spring Data Redis 的自动化配置 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-boot-starter-data-redis&lt;/artifactId&gt;
+            &lt;exclusions&gt;
+                &lt;!-- 去掉对 Lettuce 的依赖，因为 Spring Boot 优先使用 Lettuce 作为 Redis 客户端 --&gt;
+                &lt;exclusion&gt;
+                    &lt;groupId&gt;io.lettuce&lt;/groupId&gt;
+                    &lt;artifactId&gt;lettuce-core&lt;/artifactId&gt;
+                &lt;/exclusion&gt;
+            &lt;/exclusions&gt;
+        &lt;/dependency&gt;
+        &lt;!-- 引入 Jedis 的依赖 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;redis.clients&lt;/groupId&gt;
+            &lt;artifactId&gt;jedis&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!-- 引入 Zipkin 相关依赖--&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-zipkin&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!--引入 Sleuth 相关依赖 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-sleuth&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!--  Brave 对 Opentracing 的实现 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;io.opentracing.brave&lt;/groupId&gt;
+            &lt;artifactId&gt;brave-opentracing&lt;/artifactId&gt;
+            &lt;version&gt;0.35.0&lt;/version&gt;
+        &lt;/dependency&gt;
+        &lt;!-- Opentracing 对 Redis 的支持 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;io.opentracing.contrib&lt;/groupId&gt;
+            &lt;artifactId&gt;opentracing-redis-jedis3&lt;/artifactId&gt;
+            &lt;version&gt;0.1.16&lt;/version&gt;
+        &lt;/dependency&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;io.opentracing.contrib&lt;/groupId&gt;
+            &lt;artifactId&gt;opentracing-redis-spring-data&lt;/artifactId&gt;
+            &lt;version&gt;0.1.16&lt;/version&gt;
+        &lt;/dependency&gt;
+    &lt;/dependencies&gt;
+</code></pre><p>这里引入 <a href="https://mvnrepository.com/artifact/io.opentracing.brave/brave-opentracing">brave-opentracing</a> 依赖，也就是 Brave 对 Opentracing 的实现。</p><p>注意，Opentracing 和 JDBC 一样是一个通用标准，因此需要有 Brave 对 Opentracing 做具体实现，从而将链路数据写入到 Zipkin 中。就好比 JDBC 对 MySQL Driver 实现，将数据写入到 MySQL 数据库中一样。</p><p>同时，我们要引入 <a href="https://mvnrepository.com/artifact/io.opentracing.contrib/opentracing-redis-spring-data">opentracing-redis-spring-data</a> 和 <a href="https://mvnrepository.com/artifact/io.opentracing.contrib/opentracing-redis-jedis3">opentracing-redis-jedis3</a> 依赖，实现对 Jedis 操作 Redis 的链路追踪。</p><p>第二步，在 application.yml 中，添加redis相关配置。</p><pre><code class="language-yaml">spring:
+  application:
+    name: demo-service # 服务名
+  sleuth:
+    sampler: #采样器
+      probability: 1.0 #采样率，采样率是采集 Trace 的比率，默认 0.1
+      rate: 10000 #每秒数据采集量，最多 n 条/秒 Trace
+  zipkin: #设置 zipkin 服务端地址
+    base-url: http://127.0.0.1:9411
+    
+  # 对应 RedisProperties 类
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    password: # Redis redis密码，默认为空。
+    database: 0 # Redis redis中的数据库号，默认为 0。
+    timeout: 6000 # Redis 连接超时时间，单位：毫秒。
+    # 对应 RedisProperties.Jedis 内部类
+    jedis:
+      pool:
+        max-active: 8 # 连接池最大连接数，默认为 8。使用负数表示没有限制。
+        max-idle: 8 # 默认连接数最小空闲的连接数，默认为 8。使用负数表示没有限制。
+        min-idle: 0 # 默认连接池最小空闲的连接数，默认为 0。允许设置 0 和 正数。
+        max-wait: -1 # 连接池最大阻塞等待时间，单位：毫秒。默认为 -1，表示不限制。
+logging:
+  level:
+    root: debug #为演示需要，开启 debug 级别日志
+</code></pre><p>第三步，创建 SleuthConfiguration 配置类，创建一个 <a href="https://github.com/opentracing-contrib/java-redis-client/blob/master/opentracing-redis-spring-data2/src/main/java/io/opentracing/contrib/redis/spring/data2/connection/TracingRedisConnectionFactory.java">TracingRedisConnectionFactory</a> Bean 对象。这样，我们就能拦截到 Redis 操作，进行相应的链路跟踪了。</p><pre><code class="language-java">package com.dunsan.redisdemo.config;
+
+import io.opentracing.Tracer;
+import io.opentracing.contrib.redis.common.TracingConfiguration;
+import io.opentracing.contrib.redis.spring.data.connection.TracingRedisConnectionFactory;
+import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
+
+@Configuration
+public class SleuthConfiguration {
+
+    @Bean
+    public RedisConnectionFactory redisConnectionFactory(Tracer tracer, RedisProperties redisProperties) {
+        // 创建 JedisConnectionFactory 对象
+        RedisConnectionFactory connectionFactory = new JedisConnectionFactory();
+        // 创建 TracingConfiguration 对象
+        TracingConfiguration tracingConfiguration = new TracingConfiguration.Builder(tracer)
+                // 设置拓展 Tag，设置 Redis 服务器地址。因为默认情况下，不会在操作 Redis 链路的 Span 上记录 Redis 服务器的地址，所以这里需要设置。
+                .extensionTag("Server Address", redisProperties.getHost() + ":" + redisProperties.getPort())
+                .build();
+        // 创建 TracingRedisConnectionFactory 对象
+        return new TracingRedisConnectionFactory(connectionFactory, tracingConfiguration);
+    }
+    
+}
+</code></pre><p>第四步，创建 DemoController 类，提供示例 API 接口。</p><pre><code class="language-java">package com.dunsan.redisdemo.controller;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/7d")
+public class DemoController {
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
+    @GetMapping("/get")
+    public String get(@RequestParam("id") Integer id) {
+        this.get("demo");
+        return "success";
+    }
+
+    public void get(String key) {
+        redisTemplate.opsForValue().get(key);
+    }
+
+}
+</code></pre><p>这样在 /7d/get 接口中，就会执行一次 Redis 的查询。</p><p>第五步，创建 DemoServiceApplication 启动类。</p><pre><code class="language-java">package com.dunsan.redisdemo;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class DemoServiceApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(DemoServiceApplication.class, args);
+    }
+
+}
+</code></pre><p>最后启动应用。我们用 Postman 测试一下口，执行一次 Redis 查询操作，尝试跟踪该链路。</p><p>在 Zipkin 可视化 UI 中就可以看到刚才我们调用接口的链路数据了。</p><p><img src="https://static001.geekbang.org/resource/image/fc/0e/fc5a5d1423aa5651daebfcd6bfb8590e.png?wh=1915x434" alt="图片"></p><p>点开该链路，可以看到一个 Trace 明细。</p><p><img src="https://static001.geekbang.org/resource/image/9f/ff/9f1fe4da7f1e7bf7b155e3d787f74cff.png?wh=1918x756" alt="图片"></p><p>到这里，我们的 Redis 组件链路跟踪也已经成功了。</p><h3>MongoDB</h3><p>这里还是实现简单的 MongoDB 操作，我会使用 Spring Data MongoDB + MongoTemplate 进行 MongoDB 的操作。目前，Brave 默认提供了对 MongoDB 操作的链路跟踪，通过 <a href="https://github.com/openzipkin/brave/tree/master/instrumentation/mongodb">brave-instrumentation-mongo</a> 库实现收集链路数据。</p><p>我们来看下具体的实现路径：</p><p>第一步，还是引入相关依赖。</p><pre><code class="language-xml">   &lt;dependencies&gt;
+        &lt;!-- 引入 SpringMVC 相关依赖，并实现对其的自动配置 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!-- 自动化配置 Spring Data Mongodb --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-boot-starter-data-mongodb&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!-- 引入 Zipkin 相关依赖 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-zipkin&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!--添加 Sleuth 依赖 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-sleuth&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!--添加 brave mongodb 依赖 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;io.zipkin.brave&lt;/groupId&gt;
+            &lt;artifactId&gt;brave-instrumentation-mongodb&lt;/artifactId&gt;
+            &lt;version&gt;5.13.3&lt;/version&gt;
+        &lt;/dependency&gt;
+</code></pre><p>第二步，创建全局配置文件，添加MongoDB配置。</p><pre><code class="language-yaml">spring:
+  application:
+    name: demo-service # 服务名
+
+  sleuth:
+    sampler: #采样器
+      probability: 1.0 #采样率，采样率是采集 Trace 的比率，默认 0.1
+      rate: 10000 #每秒数据采集量，最多 n 条/秒 Trace
+    web:  # Web 组件的配置项，例如说 SpringMVC
+      enabled: true
+
+  zipkin: #设置 zipkin 服务端地址
+    base-url: http://127.0.0.1:9411
+
+  data:
+    # MongoDB 配置项，对应 MongoProperties 类
+    mongodb:
+      host: 127.0.0.1
+      port: 27017
+      database: demo
+#      username:
+#      password:
+logging:
+  level:
+    root: debug #为演示需要，开启 debug 级别日志
+</code></pre><p>第三步，创建 SleuthConfiguration 配置类，创建一个 <a href="https://github.com/openzipkin/brave/blob/master/instrumentation/mongodb/src/main/java/brave/mongodb/TraceMongoCommandListener.java">TraceMongoCommandListener</a> Bean 对象。这样，我们就能拦截到 MongoDB 操作，进行相应的链路跟踪了。</p><pre><code class="language-java">package com.dunshan.mongodbdemo.config;
+
+import brave.Tracer;
+import brave.Tracing;
+import brave.mongodb.MongoDBTracing;
+import com.mongodb.MongoClientSettings;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
+import com.mongodb.event.CommandListener;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class SleuthConfiguration {
+
+    @Bean
+    public MongoClient mongoClient(Tracer tracer) {
+        CommandListener listener = MongoDBTracing.create(Tracing.current())
+                .commandListener();
+        MongoClientSettings settings = MongoClientSettings.builder()
+                .addCommandListener(listener)
+                .build();
+        MongoClient client = MongoClients.create(settings);
+        return client;
+    }
+
+}
+</code></pre><p>第四步，创建 DemoController 类，提供示例 API 接口。</p><pre><code class="language-java">package com.dunshan.mongodbdemo.controller;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/7d")
+public class DemoController {
+
+    @Autowired
+    private MongoTemplate mongoTemplate;
+
+    @GetMapping("/get")
+    public String get(@RequestParam("id") Integer id) {
+        this.findById(1);
+        return "success";
+    }
+
+    public DemoDO findById(Integer id) {
+        return mongoTemplate.findOne(new Query(Criteria.where("_id").is(id)), DemoDO.class);
+    }
+
+}
+
+</code></pre><p>我们可以请求 /7d/get 接口，执行一次 MongoDB 的查询。</p><p>第五步，创建 DemoServiceApplication 启动类。</p><pre><code class="language-java">package com.dunshan.mongodbdemo;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class DemoServiceApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(DemoServiceApplication.class, args);
+    }
+
+}
+</code></pre><p>最后启动应用。我们使用 Postman 测试接口，执行一次 MongoDB 查询操作，尝试跟踪该链路。</p><p>在 Zipkin 可视化 UI 中可以看到刚才我们调用接口的链路数据。</p><p><img src="https://static001.geekbang.org/resource/image/bf/bd/bfbfb1767558068524726c361d95d1bd.png?wh=1909x556" alt="图片"></p><p>点开该链路，可以看到一个 Trace 明细。</p><p><img src="https://static001.geekbang.org/resource/image/93/45/936dd0396e3233228917ec0351f95445.png?wh=1909x997" alt="图片"></p><p>我们的 MongoDB 组件链路跟踪也已经成功了。</p><h3>RabbitMQ</h3><p>因为 <a href="https://github.com/openzipkin/brave">Brave</a> 库也默认提供了 RabbitMQ 链路追踪的功能，所以同样只需要集成就可以了。</p><p>顺便提下 ，Brave 主要通过两个插件实现链路数据收集，它们分别是：</p><ul>
+<li><a href="https://github.com/openzipkin/brave/tree/master/instrumentation/messaging">brave-instrumentation-messaging</a></li>
+<li><a href="https://github.com/openzipkin/brave/blob/master/instrumentation/spring-rabbit/">brave-instrumentation-spring-rabbit</a></li>
+</ul><p><strong>搭建生产者示例</strong></p><p>第一步，还是引入相关依赖。</p><pre><code class="language-xml">    &lt;dependencies&gt;
+        &lt;!-- 引入 SpringMVC 相关依赖，并实现对其的自动配置 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!-- 引入 Spring Cloud Stream RabbitMQ 相关依赖，将 RabbitMQ 作为消息队列，并实现对其的自动配置 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-stream-rabbit&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!-- 引入 Zipkin 依赖--&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-zipkin&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!--添加 Sleuth 依赖 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-sleuth&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+    &lt;/dependencies&gt;
+</code></pre><p>第二步，创建全局配置文件，添加RabbitMQ配置。</p><pre><code class="language-yaml">spring:
+  application:
+    name: demo-producer
+  cloud:
+    # Spring Cloud Stream 配置项，对应 BindingServiceProperties 类
+    stream:
+      # Binder 配置项，对应 BinderProperties Map
+      binders:
+        demo:
+          type: rabbit # 设置 Binder 的类型
+          environment: # 设置 Binder 的环境配置
+            # 如果是 RabbitMQ 类型的时候，则对应的是 RabbitProperties 类
+            spring:
+              rabbitmq:
+                host: 127.0.0.1 # 服务地址
+                port: 5672 # 服务端口
+                username: guest # 服务账号
+                password: guest # 服务密码
+      # Binding 配置项，对应 BindingProperties Map
+      bindings:
+        demo-output:
+          destination: DEMO-TOPIC # 目的地,使用 RabbitMQ Exchange
+          content-type: application/json # 内容格式
+          binder: demo # 设置使用的 Binder 名字
+  sleuth:
+    sampler: #采样器
+      probability: 1.0 #采样率，采样率是采集 Trace 的比率，默认 0.1
+      rate: 10000 #每秒数据采集量，最多 n 条/秒 Trace
+    messaging:
+      # Spring Cloud Sleuth 针对 RabbitMQ 组件的配置项
+      rabbit:
+        enabled: true # 是否开启
+        remote-service-name: rabbitmq # 远程服务名，默认为 rabbitmq
+  zipkin: #设置 zipkin 服务端地址
+    base-url: http://127.0.0.1:9411
+
+server:
+  port: 18080
+</code></pre><p>第三步，创建 MySource 接口，声明名字为 Output Binding。</p><pre><code class="language-java">package com.dunshan.rabbitmqdemo.producerdemo.message;
+
+import org.springframework.cloud.stream.annotation.Output;
+import org.springframework.messaging.MessageChannel;
+
+public interface MySource {
+
+    @Output("demo-output")
+    MessageChannel demoOutput();
+
+}
+</code></pre><p>第四步，创建 DemoMessage 类，示例 Message 消息。</p><pre><code class="language-java">package com.dunshan.rabbitmqdemo.producerdemo.message;
+
+/**
+ * 示例 Message 消息
+ */
+public class DemoMessage {
+
+    /**
+     * 编号
+     */
+    private Integer id;
+
+    public DemoMessage setId(Integer id) {
+        this.id = id;
+        return this;
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    @Override
+    public String toString() {
+        return "DemoMessage{" +
+                "id=" + id +
+                '}';
+    }
+
+}
+</code></pre><p>​第五步，创建 DemoController 类，提供示例 API 接口。</p><pre><code class="language-java">package com.dunshan.rabbitmqdemo.producerdemo.controller;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Random;
+
+@RestController
+@RequestMapping("/7d")
+public class DemoController {
+
+    private Logger logger = LoggerFactory.getLogger(getClass());
+
+    @Autowired
+    private MySource mySource;
+
+    @GetMapping("/send")
+    public boolean send() {
+        // 创建 Message
+        DemoMessage message = new DemoMessage()
+                .setId(new Random().nextInt());
+        // 创建 Spring Message 对象
+        Message&lt;DemoMessage&gt; springMessage = MessageBuilder.withPayload(message)
+                .build();
+        // 发送消息
+        return mySource.demoOutput().send(springMessage);
+    }
+
+}
+</code></pre><p>我们可以请求 /7d/send 接口，执行一次发送消费。</p><p>第六步，创建 DemoServiceApplication 启动类。</p><pre><code class="language-java">package com.dunshan.rabbitmqdemo.producerdemo;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.stream.annotation.EnableBinding;
+
+@SpringBootApplication
+@EnableBinding(MySource.class)
+public class ProducerApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(ProducerApplication.class, args);
+    }
+
+}
+</code></pre><p>这样，我们的生产者示例就搭建完了。</p><p><strong>搭建消费者示例</strong></p><p>第一步，还是引入相关依赖。</p><pre><code class="language-xml">    &lt;dependencies&gt;
+        &lt;!-- 引入 SpringMVC 相关依赖，并实现对其的自动配置 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!-- 引入 Spring Cloud Stream RabbitMQ 相关依赖，将 RabbitMQ 作为消息队列，并实现对其的自动配置 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-stream-rabbit&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!-- 引入 Zipkin 依赖--&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-zipkin&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!--添加 Sleuth 依赖 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-sleuth&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+    &lt;/dependencies&gt;
+</code></pre><p>第二步，创建全局配置文件，添加相关数据库配置。</p><pre><code class="language-yaml">spring:
+  application:
+    name: demo-consumer
+  cloud:
+    # Spring Cloud Stream 配置项，对应 BindingServiceProperties 类
+    stream:
+      # Binder 配置项，对应 BinderProperties Map
+      binders:
+        demo:
+          type: rabbit # 设置 Binder 的类型
+          environment: # 设置 Binder 的环境配置
+            # 如果是 RabbitMQ 类型的时候，则对应的是 RabbitProperties 类
+            spring:
+              rabbitmq:
+                host: 127.0.0.1 # RabbitMQ 服务的地址
+                port: 5672 # RabbitMQ 服务的端口
+                username: guest # 服务账号
+                password: guest # 服务密码
+      # Binding 配置项，对应 BindingProperties Map
+      bindings:
+        demo01-input:
+          destination: DEMO-TOPIC # 目的地。这里使用 RabbitMQ Exchange
+          content-type: application/json # 内容格式。这里使用 JSON
+          group: demo-consumer-group-DEMO-TOPIC # 消费者分组
+          binder: demo  # 设置使用的 Binder 名字
+
+  sleuth:
+    sampler: #采样器
+      probability: 1.0 #采样率，采样率是采集 Trace 的比率，默认 0.1
+      rate: 10000 #每秒数据采集量，最多 n 条/秒 Trace
+    messaging:
+      # Spring Cloud Sleuth 针对 RabbitMQ 组件的配置项
+      rabbit:
+        enabled: true # 是否开启
+        remote-service-name: rabbitmq # 远程服务名，默认为 rabbitmq
+  zipkin: #设置 zipkin 服务端地址
+    base-url: http://127.0.0.1:9411
+
+server:
+  port: ${random.int[10000,19999]} # 随机端口，方便启动多个消费者
+</code></pre><p>spring.sleuth.messaging.rabbit 是 Spring Cloud Sleuth 针对 RabbitMQ 组件的配置项，对应 <a href="https://github.com/spring-cloud/spring-cloud-sleuth/blob/master/spring-cloud-sleuth-core/src/main/java/org/springframework/cloud/sleuth/instrument/messaging/SleuthMessagingProperties.java#L150-L175">SleuthMessagingProperties.Rabbit</a> 类。</p><ul>
+<li>enabled 配置项，是否开启，默认为 true。</li>
+<li>remote-service-name 配置项，远程服务名，默认为 rabbitmq。</li>
+</ul><p>第三步，创建 MySink 接口，声明名字为 Intput Binding。</p><pre><code class="language-java">package com.dunshan.rabbitmqdemo.consumerdemo.listener;
+
+import org.springframework.cloud.stream.annotation.Input;
+import org.springframework.messaging.SubscribableChannel;
+
+public interface MySink {
+
+    String DEMO_INPUT = "demo-input";
+
+    @Input(DEMO_INPUT)
+    SubscribableChannel demoInput();
+
+}
+</code></pre><p>第四步，创建 DemoMessage 类，示例 Message 消息。</p><pre><code class="language-java">package com.dunshan.rabbitmqdemo.consumerdemo.message;
+
+/**
+ * 示例 Message 消息
+ */
+public class DemoMessage {
+
+    /**
+     * 编号
+     */
+    private Integer id;
+
+    public DemoMessage setId(Integer id) {
+        this.id = id;
+        return this;
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    @Override
+    public String toString() {
+        return "DemoMessage{" +
+                "id=" + id +
+                '}';
+    }
+
+}
+</code></pre><p>​第五步，创建 DemoConsumer 类，消费消息。</p><pre><code class="language-java">package com.dunshan.rabbitmqdemo.consumerdemo.listener;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.cloud.stream.annotation.StreamListener;
+import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.stereotype.Component;
+
+@Component
+public class DemoConsumer {
+
+    private Logger logger = LoggerFactory.getLogger(getClass());
+
+    @StreamListener(MySink.DEMO_INPUT)
+    public void onMessage(@Payload DemoMessage message) {
+        logger.info("[onMessage][线程编号:{} 消息内容：{}]", Thread.currentThread().getId(), message);
+    }
+
+}
+</code></pre><p>第六步，创建 DemoServiceApplication 启动类。</p><pre><code class="language-java">package com.dunshan.rabbitmqdemo.consumerdemo;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.stream.annotation.EnableBinding;
+
+@SpringBootApplication
+@EnableBinding(MySink.class)
+public class ConsumerApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(ConsumerApplication.class, args);
+    }
+
+}
+</code></pre><p>最后，启动应用。我们使用 Postman 测试一下接口，发送一条消息，尝试跟踪该链路。</p><p><img src="https://static001.geekbang.org/resource/image/ef/be/ef4dfa07248e4c3c0a1c16abyy2a84be.png?wh=1920x1110" alt="图片"></p><p>查看结果，在 Zipkin 已经可以看到刚才我们调用接口的链路数据了。</p><p><img src="https://static001.geekbang.org/resource/image/41/61/41492e413b4772bcc3409c7f9fc04c61.png?wh=1912x579" alt="图片"></p><p>点开该链路可以看到一个 Trace 明细。</p><p><img src="https://static001.geekbang.org/resource/image/68/de/68d35a1c927d1b543d5b3e58386e07de.png?wh=1914x920" alt="图片"></p><p>到这里，我们的 RabbitMQ 组件链路跟踪也成功了。</p><p>刚才，我对所有的技术组件都单独进行了 demo 预演。单就这个过程来说，改造的复杂度还是可以接受的。接下来我们就一起来看看，怎么让它们在真实项目中落地。</p><h2></h2><h2>系统改造</h2><h3>服务改造</h3><p>我这里主要介绍三个服务的改造过程（其他服务是类似的操作），它们分别是：</p><ol>
+<li>mall-gateway，API 网关</li>
+<li>mall-auth，认证中心服务</li>
+<li>mall-member，会员系统服务</li>
+</ol><p>mall-gateway 主要使用的是 Spring Cloud Gateway 技术，我们这个项目的主要用途是路由匹配、请求统一校验认证和鉴权。</p><p>大致的执行流程可以参考<a href="https://docs.spring.io/spring-cloud-gateway/docs/current/reference/html">下图</a>。</p><p><img src="https://static001.geekbang.org/resource/image/42/15/42ab6bd5e6de4a937d418a62c4e85415.jpg?wh=503x595" alt=""></p><p>通过上面的介绍，我们知道 Sleuth 原生就支持对 Spring Cloud Gateway 链路追踪，所以我们只需要集成就可以了。</p><p>我们在 pom.xml 文件引入相关依赖。</p><pre><code class="language-xml">&lt;dependencies&gt;
+        &lt;!-- 引入 Spring Cloud Gateway 相关依赖--&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-gateway&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!-- 引入 Zipkin 依赖--&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-zipkin&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!--添加 Sleuth 依赖 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-sleuth&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+    &lt;/dependencies&gt;
+</code></pre><ul>
+<li>mall-auth</li>
+</ul><p>mall-auth 是认证中心服务，主要结合 Oauth2 实现用 JWT 令牌存储信息、刷新令牌功能还有权限认证等工作，涉及的组件主要为 Redis （非 Jedis 客户端方式）和 MySQL。</p><p>所以在 pom.xml 文件，引入相关依赖即可。</p><pre><code class="language-java">  &lt;!--添加 Sleuth 依赖 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-sleuth&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!--Zipkin 客户端--&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-zipkin&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!-- Brave 对 MySQL8 的支持 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;io.zipkin.brave&lt;/groupId&gt;
+            &lt;artifactId&gt;brave-instrumentation-mysql8&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+</code></pre><p>​启动应用后，我们使用 API 文档测试下接口，尝试跟踪该链路。</p><p><img src="https://static001.geekbang.org/resource/image/18/46/18cab3ba4c2d9fa202602d8d262ff846.png?wh=1912x996" alt="图片"></p><p>在 Zipkin 就可以看到刚才我们调用接口的链路数据了，它分别涉及了四个组件。</p><p><img src="https://static001.geekbang.org/resource/image/4d/47/4d3814b90bd397aca6baafd8e8917e47.png?wh=1911x993" alt="图片"></p><p>我们点开该链路，可以看到一个 Trace 明细。</p><p><img src="https://static001.geekbang.org/resource/image/27/yy/27e86aae5d5882e049d7ebd7509b2eyy.png?wh=1918x1001" alt="图片"></p><p>同样，我们也可以查看拓扑关系。</p><p><img src="https://static001.geekbang.org/resource/image/f6/4f/f68c61215de55649a42acc9cdfd1764f.png?wh=1915x996" alt="图片"></p><ul>
+<li>mall-member</li>
+</ul><p>mall-member 是我们的会员服务，这里以核心接口【会员登录】为例，梳理一下它涉及到的组件。</p><p><img src="https://static001.geekbang.org/resource/image/0d/12/0d5bd029e555f860e31a60f5dba2ff12.png?wh=1920x1069" alt="图片"></p><p>通过分析代码调用链，我们知道它主要涉及 MySQL、Redis、MongoDB 等组件。</p><p>所以我们只需要在 pom.xml 文件引入相关依赖即可。</p><pre><code class="language-xml">   &lt;!--添加 Sleuth 依赖 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-sleuth&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!--Zipkin 客户端--&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-zipkin&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!-- Brave 对 MySQL8 的支持 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;io.zipkin.brave&lt;/groupId&gt;
+            &lt;artifactId&gt;brave-instrumentation-mysql8&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+        &lt;!--添加 brave mongodb 依赖 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;io.zipkin.brave&lt;/groupId&gt;
+            &lt;artifactId&gt;brave-instrumentation-mongodb&lt;/artifactId&gt;
+            &lt;version&gt;5.13.3&lt;/version&gt;
+        &lt;/dependency&gt;
+        &lt;!--  Brave 对 Opentracing 的实现 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;io.opentracing.brave&lt;/groupId&gt;
+            &lt;artifactId&gt;brave-opentracing&lt;/artifactId&gt;
+            &lt;version&gt;0.35.0&lt;/version&gt;
+        &lt;/dependency&gt;
+        &lt;!-- Opentracing 对 Redis 的支持 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;io.opentracing.contrib&lt;/groupId&gt;
+            &lt;artifactId&gt;opentracing-redis-jedis3&lt;/artifactId&gt;
+            &lt;version&gt;0.1.16&lt;/version&gt;
+        &lt;/dependency&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;io.opentracing.contrib&lt;/groupId&gt;
+            &lt;artifactId&gt;opentracing-redis-spring-data&lt;/artifactId&gt;
+            &lt;version&gt;0.1.16&lt;/version&gt;
+        &lt;/dependency&gt;
+</code></pre><p>同时，要在 config 下新增两个配置类。</p><p><img src="https://static001.geekbang.org/resource/image/9d/22/9d8864e4cbe9c4e22d0438e895b22922.png?wh=624x534" alt="图片"></p><p>BraveConfiguration 为 MongoDB 链路追踪配置类，OpentracingConfiguration 为 Redis 组件链路追踪配置类。</p><p>启动应用后，我们使用 API 文档测试【会员登录】接口，尝试追踪该链路。</p><p><img src="https://static001.geekbang.org/resource/image/99/af/99959835f5316c4a62d13e2a8d13c2af.png?wh=1904x992" alt="图片"></p><p>在 Zipkin 中可以看到刚才我们调用接口的链路数据，它分别涉及了五个组件。</p><p><img src="https://static001.geekbang.org/resource/image/25/c8/2589ff807a90609f80b08209e1b85ac8.png?wh=1913x997" alt="图片"></p><p>我们点开这条链路，可以看到 Trace 明细。</p><p><img src="https://static001.geekbang.org/resource/image/2c/af/2ce6b93d67eaa781e45772b7a245b8af.png?wh=1917x998" alt="图片"></p><p>也可以查找依赖，看到拓扑关系。</p><p><img src="https://static001.geekbang.org/resource/image/cd/6b/cd8e3ebf8fded10bc62dbe251760f26b.png?wh=1913x992" alt="图片"></p><p>接着我们使用 API 文档测试一下【添加品牌关注】接口，尝试追踪该链路。</p><p><img src="https://static001.geekbang.org/resource/image/b4/4d/b49a43e149ce7de2ec2yyc763e66604d.png?wh=1915x1000" alt="图片"></p><p>在 Zipkin 可以看到刚才我们调用接口的链路数据，它分别涉及了三个组件。</p><p><img src="https://static001.geekbang.org/resource/image/7a/17/7a81b796da4d1dc86e4c7d73754b1417.png?wh=1913x996" alt="图片"></p><p>我们点开这条链路，也可以看到详细的 Trace 明细。</p><p><img src="https://static001.geekbang.org/resource/image/7e/a0/7e7d92b90da5ac1d65f7b00b7d172ca0.png?wh=1915x845" alt="图片"></p><h3>Zipkin 改造</h3><p>改造完服务后，我们还有一个需求，那就是对 Zipkin 生产环境的功能增强。也就是说， 我们这里将链路日志推送到 Kafka，然后启动 Zipkin Server 聚合日志，监听 Kafka ，如果有新的消息则进行拉取存入到 ElasticSeach，最后再用 Zipkin UI 展示链路过程。</p><p>这里的改造大概分为两个部分：</p><ul>
+<li>将链路日志数据写入 Kafka 进行削峰；</li>
+<li>Kafka 写入 Zipkin Server 进行聚合并存储。</li>
+</ul><p>第一步，我们需要在各个服务引入 Kafka 依赖。</p><pre><code class="language-xml">  &lt;!-- 引入 Spring Cloud Stream Kafka--&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-cloud-starter-stream-kafka&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+</code></pre><p>​第二步，修改 bootstrap.yml 配置文件，增加 Kafka 系列配置。</p><pre><code class="language-yaml">spring:
+  zipkin: #设置zipkin服务端地址
+    sender:
+      type: kafka  #指定发送到kafka,还可以指定Rabbit、Web
+    service:
+      name: ${spring.application.name} #Zipkin链路日志中收集的服务名称
+    kafka:
+      topic: zipkin
+  kafka:
+    bootstrap-servers: kafka:9092 #Kubernetes中Kakfa地址,当然也可以指定Kubernetes集群外的Kafk
+</code></pre><p>第三步，Zipkin 安装时增加 Storage 参数，比如 Docker 安装可以参考我给出的命令。</p><pre><code class="language-bash">docker run -it -d --restart=always -e KAFKA_BOOTSTRAP_SERVERS=192.168.3.58:9092 -e STORAGE_TYPE=elasticsearch -e ES_HOSTS=http://192.168.3.58:9200 -p 9411:9411  openzipkin/zipkin
+</code></pre><p>第四步，在 Kafka Manager 验证一下 Topic 情况。</p><p><img src="https://static001.geekbang.org/resource/image/de/a7/dea1fc60cd3b14999984da7eb72b8ea7.png?wh=1214x595" alt="图片"></p><p>最后，我们使用 ES Head 客户端插件查询一下链路日志。</p><p><img src="https://static001.geekbang.org/resource/image/e4/19/e4e06fbyye7d9ef2f4b50d9ebe282919.png?wh=1912x996" alt="图片"></p><p>可以看到，链路追踪数据已经成功保存了。</p><h2>总结</h2><p>好了，这节课的内容到这里就全部讲完了。</p><p>刚才，我们进行了 demo 预演和系统实战，演示了如何在微服务项目中集成 Sleuth + Zipkin 落地链路追踪，希望能够给你一些启发。</p><p>这里有几个重点我们再一起回顾一下：</p><ul>
+<li>在 <a href="https://github.com/openzipkin/brave">Brave</a> 库，常见的 Spring Cloud Gateway、SpringMVC、Fegin、Logback、MongoDB、MySQL、RabbitMQ 等组件均已默认支持；</li>
+<li>目前 Brave 支持通过三种插件实现 MySQL 链路追踪，具体需要适配 MySQL 驱动版本；</li>
+<li>目前 Brave 暂未支持 Jedis 客户端的方式，所以我们可以考虑替代用 OpenTracing 的方式；</li>
+<li>从经验性角度，前置 kafka，一方面作为队列和缓冲，另一方面提供了统一的入口渠道，通过将链路日志数据写入 Kafka 进行削峰，再由 Kafka 写入 Zipkin Server 进行聚合，所以较适合数据量大、服务多的环境。</li>
+</ul><p>链路追踪现如今已成为微服务架构性能监控的标配，如何去选型并结合系统本身的特点做到成功的改造是不容易的。希望你可以动手实践起来，因为只有实践才是检验真理的唯一标准。</p><h2></h2><h2>思考题</h2><p>在课程的最后，我还是照例给你留两道思考题：</p><ol>
+<li>你觉得使用 Brave SDK，手动埋点生成 Trace 的难点在哪里？为什么？</li>
+<li>在生产环境中为什么考虑把链路追踪日志先推送到 Kafka 消息队列？</li>
+</ol><p>欢迎你在留言区和我交流讨论，我们下节课见！</p>

@@ -1,0 +1,172 @@
+<p>这篇文章我们来重点学习 Docker 和 Kubernetes，它们已经是分布式架构和自动化运维的必备工具了。对于这两个东西，你千万不要害怕，因为技术方面都不算复杂，只是它们的玩法和传统运维不一样，所以你不用担心，只要你花上一点时间，一定可以学好的。</p><h1>Docker</h1><ul>
+<li>
+<p>你可以先看一下Docker的官方介绍 <a href="https://docs.docker.com/engine/docker-overview/">Docker Overview</a> 。</p>
+</li>
+<li>
+<p>然后再去一个Web在线的Playground上体验一下， <a href="https://www.katacoda.com/courses/docker/playground">Katacoda Docker Playground</a> 或者是 <a href="https://training.play-with-docker.com/">Play With Docker</a> 。</p>
+</li>
+<li>
+<p>接下来，跟着 <a href="https://github.com/dwyl/learn-docker">Learn Docker</a> 这个文档中的教程自己安装一个Docker的环境，实操一把。</p>
+</li>
+<li>
+<p>然后跟着 <a href="https://docker-curriculum.com/">Docker Curriculum</a> 这个超详细的教程玩一下Docker。</p>
+</li>
+</ul><p>有了上述的一些感性体会之后，你就可以阅读Docker官方文档 <a href="https://docs.docker.com/">Docker Documentation</a> 了，这是学习Docker最好的方式。</p><p>如果你想了解一下Docker的底层技术细节，你可以参看我的文章。</p><ul>
+<li><a href="https://coolshell.cn/articles/17010.html">Docker 基础技术：Linux Namespace（上）</a></li>
+<li><a href="https://coolshell.cn/articles/17029.html">Docker 基础技术：Linux Namespace（下）</a></li>
+<li><a href="https://coolshell.cn/articles/17049.html">Docker 基础技术：Cgroup</a></li>
+<li><a href="https://coolshell.cn/articles/17061.html">Docker 基础技术：AUFS</a></li>
+<li><a href="https://coolshell.cn/articles/17200.html">Docker 基础技术：DeviceMapper</a></li>
+</ul><!-- [[[read_end]]] --><p>还有一些不错的与Docker网络有关的文章你需要阅读及实践一下。</p><ul>
+<li><a href="https://jvns.ca/blog/2016/12/22/container-networking/">A container networking overview</a></li>
+<li><a href="http://www.dasblinkenlichten.com/docker-networking-101-user-defined-networks/">Docker networking 101 - User defined networks</a></li>
+<li><a href="http://www.dasblinkenlichten.com/understanding-cni-container-networking-interface/">Understanding CNI (Container Networking Interface)</a></li>
+<li><a href="http://www.dasblinkenlichten.com/using-cni-docker/">Using CNI with Docker</a></li>
+</ul><p>Docker有下面几种网络解决方案：<a href="https://www.projectcalico.org/getting-started/docker/">Calico</a> 、<a href="https://github.com/coreos/flannel/">Flannel</a> 和 <a href="https://github.com/weaveworks/weave">Weave</a> ，你需要学习一下。另外，还需要学习一下 <a href="https://github.com/nicolaka/netshoot">netshoot</a> ，这是一个很不错的用来诊断Docker网络问题的工具集。</p><p>关于这几个容器网络解决方案的性能对比，你可以看一下下面这几篇文章或报告。</p><ul>
+<li>
+<p><a href="http://chunqi.li/2015/11/15/Battlefield-Calico-Flannel-Weave-and-Docker-Overlay-Network/">Battlefield: Calico, Flannel, Weave and Docker Overlay Network</a></p>
+</li>
+<li>
+<p><a href="http://machinezone.github.io/research/networking-solutions-for-kubernetes/">Comparison of Networking Solutions for Kubernetes</a></p>
+</li>
+<li>
+<p><a href="http://www.delaat.net/rp/2015-2016/p50/report.pdf">Docker Overlay Networks: Performance analysis in high-latency enviroments</a></p>
+</li>
+</ul><p>如果你对Docker的性能有什么问题的话，你可以看一下下面这些文章。</p><ul>
+<li>
+<p><a href="https://domino.research.ibm.com/library/cyberdig.nsf/papers/0929052195DD819C85257D2300681E7B/$File/rc25482.pdf">IBM Research Report: An Updated Performance Comparison of Virtual Machines and Linux Containers</a></p>
+</li>
+<li>
+<p><a href="http://paper.ijcsns.org/07_book/201703/20170327.pdf">An Introduction to Docker and Analysis of its Performance</a></p>
+</li>
+</ul><p>下面是一些和存储相关的文章。</p><ul>
+<li>
+<p><a href="http://cloud-mechanic.blogspot.de/2014/10/storage-concepts-in-docker-network-and.html">Storage Concepts in Docker: Network and Cloud Storage</a></p>
+</li>
+<li>
+<p><a href="http://cloud-mechanic.blogspot.de/2014/10/storage-concepts-in-docker-persistent.html">Storage Concepts in Docker: Persistent Storage</a></p>
+</li>
+<li>
+<p><a href="http://cloud-mechanic.blogspot.de/2014/10/storage-concepts-in-docker.html">Storage Concepts in Docker: Shared Storage and the VOLUME directive</a></p>
+</li>
+</ul><p>然后是跟运维相关的文章。</p><ul>
+<li><a href="https://logz.io/learn/docker-monitoring-elk-stack/">Docker Monitoring with the ELK Stack: A Step-by-Step Guide</a></li>
+</ul><p>最后，推荐看看 <a href="http://www.nkode.io/2014/08/24/valuable-docker-links.html">Valuable Docker Links</a> ，其中收集并罗列了一系列非常不错的 Docker 文章。</p><p><strong>最佳实践</strong></p><p>下面分享一些与Docker相关的最佳实践。</p><ul>
+<li>
+<p><a href="https://docs.docker.com/develop/develop-images/dockerfile_best-practices/">Best Practices for Dockerfile</a> ，Docker官方文档里的Dockerfile的最佳实践。</p>
+</li>
+<li>
+<p><a href="https://github.com/FuriKuri/docker-best-practices">Docker Best Practices</a> ，这里收集汇总了存在于各个地方的使用Docker的建议和实践。</p>
+</li>
+<li>
+<p><a href="http://docs.projectatomic.io/container-best-practices/">Container Best Practices</a> ，来自Atomic项目，是一个介绍容器化应用程序的架构、创建和管理的协作型文档项目。</p>
+</li>
+<li>
+<p><a href="http://hokstad.com/docker/patterns">Eight Docker Development Patterns</a> ，八个Docker的开发模式：共享基础容器、共享同一个卷的多个开发容器、开发工具专用容器、测试环境容器、编译构建容器、防手误的安装容器、默认服务容器、胶黏容器（如英文链接不能访问，可阅读<a href="https://www.infoq.cn/article/2014/10/seven-docker-develop-pattern">中文版本</a>）。</p>
+</li>
+</ul><h1>Kubernetes</h1><p>Kubernetes 是Google开源的容器集群管理系统，是Google多年大规模容器管理技术Borg的开源版本，也是CNCF最重要的项目之一，主要功能包括：</p><ul>
+<li>基于容器的应用部署、维护和滚动升级；</li>
+<li>负载均衡和服务发现；</li>
+<li>跨机器和跨地区的集群调度；</li>
+<li>自动伸缩；</li>
+<li>无状态服务和有状态服务；</li>
+<li>广泛的Volume支持；</li>
+<li>插件机制保证扩展性。</li>
+</ul><p>Kubernetes发展非常迅速，已经成为容器编排领域的领导者。</p><p>首先，我推荐你阅读Kubernetes前世今生的一篇论文。</p><ul>
+<li><a href="https://static.googleusercontent.com/media/research.google.com/zh-CN//pubs/archive/44843.pdf">Borg, Omega, and Kubernetes</a> ，看看Google这十几年来从这三个容器管理系统中得到的经验教训。</li>
+</ul><p>学习Kubernetes，有两个免费的开源电子书。</p><ul>
+<li>
+<p>《<a href="https://jimmysong.io/kubernetes-handbook/">Kubernetes Handbook</a>》，这本书记录了作者从零开始学习和使用Kubernetes的心路历程，着重于经验分享和总结，同时也会有相关的概念解析。希望能够帮助你少踩坑，少走弯路，还会指引你关注kubernetes生态周边，如微服务构建、DevOps、大数据应用、Service Mesh、Cloud Native等领域。</p>
+</li>
+<li>
+<p>《<a href="https://kubernetes.feisky.xyz/zh/">Kubernetes指南</a>》，这本书旨在整理平时在开发和使用Kubernetes时的参考指南和实践总结，形成一个系统化的参考指南以方便查阅。</p>
+</li>
+</ul><p>这两本电子书都不错，前者更像是一本学习教程，而且面明显广一些，还包括Cloud Natvie、Service Mesh以及微服务相关的东西。而后者聚焦于Kubernetes本身，更像一本参考书。</p><p><strong>另外，我这两天也读完了《Kubernetes in Action》一书，感觉写的非常好，一本很完美的教科书，抽丝剥茧，图文并茂。如果你只想读一本有关Kubernetes的书来学习Kubernetes，那么我推荐你就选这本。</strong></p><p>但是也别忘了Kubernetes的官方网站：<a href="https://kubernetes.io/">Kubernetes.io</a>，上面不但有<a href="https://kubernetes.io/docs/home/">全面的文档</a> ，也包括一个很不错的 <a href="https://kubernetes.io/docs/tutorials/kubernetes-basics/">官方教程</a> 。</p><p>此外，还有一些交互式教程，帮助你理解掌握，以及一些很不错的文章推荐你阅读。</p><p><strong>一些交互式教程</strong></p><ul>
+<li><a href="https://www.katacoda.com/courses/kubernetes">Katacoda</a></li>
+<li><a href="https://kubernetesbootcamp.github.io/kubernetes-bootcamp/">Kubernetes Bootcamp</a></li>
+</ul><p><strong>一些文章</strong></p><p>这里还有一些不错的文档，你应该去读一下。</p><ul>
+<li><a href="https://opsnotice.xyz/kubernetes-tips-tricks/">Kubernetes tips &amp; tricks</a></li>
+<li><a href="http://theremotelab.com/blog/achieving-ci-cd-with-k8s/">Achieving CI/CD with Kubernetes</a></li>
+<li><a href="https://dzone.com/articles/how-to-setup-scalable-jenkins-on-top-of-a-kubernet">How to Set Up Scalable Jenkins on Top of a Kubernetes Cluster</a></li>
+<li>10 Most Common Reasons Kubernetes Deployments Fail <a href="https://kukulinski.com/10-most-common-reasons-kubernetes-deployments-fail-part-1/">Part I</a> 和 <a href="https://kukulinski.com/10-most-common-reasons-kubernetes-deployments-fail-part-2/">Part II</a></li>
+<li><a href="http://sysdig.com/blog/monitoring-kubernetes-with-sysdig-cloud/">How to Monitor Kubernetes</a> ，一共有4个篇章</li>
+<li><a href="http://www.dasblinkenlichten.com/logging-in-kubernetes-with-fluentd-and-elasticsearch/">Logging in Kubernetes with Fluentd and Elasticsearch</a></li>
+<li><a href="https://dzone.com/articles/kubernetes-monitoring-best-practices-methods-and-e">Kubernetes Monitoring: Best Practices, Methods, and Existing Solutions</a></li>
+</ul><p><strong>网络相关的文章</strong></p><p>要学习Kubernetes，你只需要读一下，下面这个Kubernetes 101系列的文章。</p><ul>
+<li><a href="http://www.dasblinkenlichten.com/kubernetes-101-networking/">Kubernetes 101 - Networking</a></li>
+<li><a href="http://www.dasblinkenlichten.com/kubernetes-networking-101-pods/">Kubernetes networking 101 - Pods</a></li>
+<li><a href="http://www.dasblinkenlichten.com/kubernetes-networking-101-services/">Kubernetes networking 101 - Services</a></li>
+<li><a href="http://www.dasblinkenlichten.com/kubernetes-networking-101-basic-external-access-into-the-cluster/">Kubernetes networking 101 - (Basic) External access into the cluster</a></li>
+<li><a href="http://www.dasblinkenlichten.com/kubernetes-networking-101-ingress-resources/">Kubernetes Networking 101 - Ingress resources</a></li>
+<li><a href="http://www.dasblinkenlichten.com/getting-started-with-calico-on-kubernetes/">Getting started with Calico on Kubernetes</a></li>
+</ul><p><strong>CI/CD相关的文章</strong></p><ul>
+<li><a href="https://cloud.google.com/solutions/automated-build-images-with-jenkins-kubernetes#kubernetes_architecture">Automated Image Builds with Jenkins, Packer, and Kubernetes</a></li>
+<li><a href="http://iocanel.blogspot.in/2015/09/jenkins-setups-for-kubernetes-and.html">Jenkins setups for Kubernetes and Docker Workflow</a></li>
+<li><a href="https://github.com/GoogleCloudPlatform/continuous-deployment-on-kubernetes">Lab: Build a Continuous Deployment Pipeline with Jenkins and Kubernetes</a></li>
+</ul><p><strong>最佳实践</strong></p><ul>
+<li><a href="https://medium.com/@sachin.arote1/kubernetes-best-practices-9b1435a4cb53">Kubernetes Best Practices</a> by <a href="https://medium.com/@sachin.arote1?source=post_header_lockup">Sachin Arote</a> ，AWS工程师总结的最佳实践。</li>
+<li><a href="https://speakerdeck.com/thesandlord/kubernetes-best-practices">Kubernetes Best Practices</a> by <a href="https://github.com/thesandlord">Sandeep Dinesh</a> ，Google云平台工程师总结的最佳实践。</li>
+</ul><p><strong>Docker和Kubernetes资源汇总</strong></p><p>下面是 GitHub 上和 Docker &amp; Kubernetes相关的Awesome系列。</p><ul>
+<li><a href="https://github.com/veggiemonk/awesome-docker">Awesome Docker</a>。</li>
+<li><a href="https://github.com/ramitsurana/awesome-kubernetes">Awesome Kubernetes</a>。</li>
+</ul><p>虽然上面的这些系列非常全的罗列了很多资源，但是我觉得很不系统。对于系统的说明Docker和Kubernetes生态圈，我非常推荐大家看一下 The New Stack 为Kubernetes出的一系列的电子书或报告。</p><ul>
+<li>
+<p><a href="http://thenewstack.io/ebookseries/">The New Stack eBook Series</a> ，非常完整和详实的 Docker 和 Kubernetes 生态圈的所有东西。</p>
+<ul>
+<li>Book 01: <a href="https://thenewstack.io/ebooks/docker-and-containers/the-docker-container-ecosystem/">The Docker Container Ecosystem</a></li>
+<li>Book 02: <a href="https://thenewstack.io/ebooks/docker-and-containers/applications-microservices-docker-containers/">Applications &amp; Microservices with Docker &amp; Containers</a></li>
+<li>Book 03: <a href="https://thenewstack.io/ebooks/docker-and-containers/automation-orchestration-docker-containers/">Automation &amp; Orchestration with Docker &amp; Containers</a></li>
+<li>Book 04: <a href="https://thenewstack.io/ebooks/docker-and-containers/networking-security-storage-docker-containers/">Network, Security &amp; Storage with Docker &amp; Containers</a></li>
+<li>Book 05: <a href="https://thenewstack.io/ebooks/docker-and-containers/monitoring-management-docker-containers/">Monitoring &amp; Management with Docker &amp; Containers</a></li>
+<li>Book 06: <a href="https://thenewstack.io/ebooks/use-cases/use-cases-for-kubernetes/">Use Cases for Kubernetes</a></li>
+<li>Book 07: <a href="https://thenewstack.io/ebooks/kubernetes/state-of-kubernetes-ecosystem/">State of the Kubernetes Ecosystem</a></li>
+<li>Book 08: <a href="https://thenewstack.io/ebooks/kubernetes/kubernetes-deployment-and-security-patterns/">Kubernetes Deployment &amp; Security Patterns</a></li>
+<li>Book 09: <a href="https://thenewstack.io/ebooks/kubernetes/ci-cd-with-kubernetes/">CI/CD with Kubernetes</a></li>
+<li>Book 10: <a href="https://thenewstack.io/ebooks/kubernetes/kubernetes-solutions-directory/">Kubernetes solutions Directory</a></li>
+<li>Book 11: <a href="https://thenewstack.io/ebooks/microservices/cloud-native-microservices-2018/">Guid to Cloud-Native Microservices</a></li>
+</ul>
+</li>
+</ul><h1>小结</h1><p>总结一下今天的内容。Docker 和 Kubernetes已经成为分布式架构和自动化运维方面的不可或缺的两大基本构成，是你必需要学习的。虽然它们的玩法跟传统运维不一样，但技术方面并不算复杂，只要你花上一点时间，一定会学好的。</p><p>在这篇文章中，我推荐了Docker和Kubernetes基础技术方面的学习资料，并给出了存储、运维、网络、CI/CD等多方面的资料，同时列出了与之相关的最佳实践。相信认真学习和消化这些知识，你一定可以掌握Docker和Kubernetes两大利器。</p><p>下篇文章，我们将学习机器学习和人工智能方面的内容。敬请期待。</p><p>下面是《程序员练级攻略》系列文章的目录。</p><ul>
+<li><a href="https://time.geekbang.org/column/article/8136">开篇词</a></li>
+<li>入门篇
+<ul>
+<li><a href="https://time.geekbang.org/column/article/8216">零基础启蒙</a></li>
+<li><a href="https://time.geekbang.org/column/article/8217">正式入门</a></li>
+</ul>
+</li>
+<li>修养篇
+<ul>
+<li><a href="https://time.geekbang.org/column/article/8700">程序员修养</a></li>
+</ul>
+</li>
+<li>专业基础篇
+<ul>
+<li><a href="https://time.geekbang.org/column/article/8701">编程语言</a></li>
+<li><a href="https://time.geekbang.org/column/article/8887">理论学科</a></li>
+<li><a href="https://time.geekbang.org/column/article/8888">系统知识</a></li>
+</ul>
+</li>
+<li>软件设计篇
+<ul>
+<li><a href="https://time.geekbang.org/column/article/9369">软件设计</a></li>
+</ul>
+</li>
+<li>高手成长篇
+<ul>
+<li><a href="https://time.geekbang.org/column/article/9759">Linux系统、内存和网络（系统底层知识）</a></li>
+<li><a href="https://time.geekbang.org/column/article/9851">异步I/O模型和Lock-Free编程（系统底层知识）</a></li>
+<li><a href="https://time.geekbang.org/column/article/10216">Java底层知识</a></li>
+<li><a href="https://time.geekbang.org/column/article/10301">数据库</a></li>
+<li><a href="https://time.geekbang.org/column/article/10603">分布式架构入门（分布式架构）</a></li>
+<li><a href="https://time.geekbang.org/column/article/10604">分布式架构经典图书和论文（分布式架构）</a></li>
+<li><a href="https://time.geekbang.org/column/article/11232">分布式架构工程设计(分布式架构)</a></li>
+<li><a href="https://time.geekbang.org/column/article/11116">微服务</a></li>
+<li><a href="https://time.geekbang.org/column/article/11665">容器化和自动化运维</a></li>
+<li><a href="https://time.geekbang.org/column/article/11669">机器学习和人工智能</a></li>
+<li><a href="https://time.geekbang.org/column/article/12271">前端基础和底层原理（前端方向）</a></li>
+<li><a href="https://time.geekbang.org/column/article/12389">前端性能优化和框架（前端方向）</a></li>
+<li><a href="https://time.geekbang.org/column/article/12486">UI/UX设计（前端方向）</a></li>
+<li><a href="https://time.geekbang.org/column/article/12561">技术资源集散地</a></li>
+</ul>
+</li>
+</ul>

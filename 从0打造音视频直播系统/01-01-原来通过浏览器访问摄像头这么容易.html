@@ -1,0 +1,83 @@
+<p>对于很多从事 JavaScript 开发的同学来说，基本都认为 JavaScript 是专门做页面控制的。如果用 JavaScript 做音视频处理，那真是很难想象的事儿。你可能首先想到的问题是：JavaScript或者浏览器的性能跟得上吗？</p><p>而 Google 却不这么认为。 Google 就是要做一些常人无法想象，又难以理解的事情，否则它就不是 Google 了。</p><p>“<strong>浏览器 + WebRTC</strong>”就是 Google 给出的答案。2011年，Google 创立了 WebRTC 项目，其愿景就是可以在浏览器之间快速地实现音视频通信。</p><p>随着 WebRTC 1.0 规范的推出，现在主流浏览器Chrome、Firefox、Safari以及 Edge 都已经支持了WebRTC库。换句话说，<strong>在这些浏览器之间进行实时音视频通信已经很成熟了</strong>。</p><p>下面我就通过讲解JavaScript/浏览器访问电脑上的音视频设备，向你展示通过现代浏览器访问音视频设备是何其简单。</p><h2>WebRTC处理过程</h2><p>在正式讲解如何通过浏览器采集音视频数据之前，我先向你介绍一下 WebRTC 实现一对一音视频实时通话的整个处理过程。对这个过程的了解，可以帮助你在阅读文章时，能清楚明了地知道所阅读的这篇文章、所要学习的知识点在整个处理过程中的位置。</p><!-- [[[read_end]]] --><p><img src="https://static001.geekbang.org/resource/image/c5/a0/c536a1dd0ed50008d2ada594e052d6a0.png" alt=""></p><center><span class="reference">WebRTC 1对1音视频实时通话过程示意图</span></center><p>上面这幅图是整个WebRTC 1对1音视频实时通话的过程图。通过这幅图，你可以看出要实现 1对1音视频实时通话其过程还是蛮复杂的。</p><p>这幅图从大的方面可以分为4部分，即<strong>两个 WebRTC 终端</strong>（上图中的两个大方框）、<strong>一个 Signal（信令）服务器</strong>和<strong>一个 STUN/TURN 服务器</strong>。</p><ul>
+<li>WebRTC 终端，负责音视频采集、编解码、NAT 穿越、音视频数据传输。</li>
+<li>Signal 服务器，负责信令处理，如加入房间、离开房间、媒体协商消息的传递等。</li>
+<li>STUN/TURN服务器，负责获取WebRTC终端在公网的IP地址，以及NAT穿越失败后的数据中转。</li>
+</ul><p>接下来，我就向你描述一下<strong>WebRTC进行音视频通话的大体过程</strong>。</p><p>当一端（WebRTC终端）进入房间之前，它首先会检测自己的设备是否可用。如果此时设备可用，则进行<strong>音视频数据采集</strong>，这也是本篇我们要介绍的重点内容。</p><p>采集到的数据一方面可以做预览，也就是让自己可以看到自己的视频；另一方面，可以将其录制下来保存成文件，等到视频通话结束后，上传到服务器让用户回看之前的内容。</p><p>在获取音视频数据就绪后，WebRTC终端要发送 “<strong>加入</strong>” 信令到 Signal 服务器。Signal 服务器收到该消息后会创建房间。在另外一端，也要做同样的事情，只不过它不是创建房间，而是加入房间了。待第二个终端成功加入房间后，第一个用户会收到 “<strong>另一个用户已经加入成功</strong>” 的消息。</p><p>此时，第一个终端将创建 <strong>“媒体连接” 对象</strong>，即<strong>RTCPeerConnection</strong>（该对象会在后面的文章中做详细介绍），并将采集到的音视频数据通过 RTCPeerConnection 对象进行编码，最终通过 P2P 传送给对端。</p><p>当然，在进行 P2P 穿越时很有可能失败。所以，当P2P穿越失败时，为了保障音视频数据仍然可以互通，则需要通过 TURN 服务器（TURN服务会在后面文章中专门介绍）进行音视频数据中转。</p><p>这样，当音视频数据 “历尽千辛万苦” 来到对端后，对端首先将收到的音视频数据进行解码，最后再将其展示出来，这样就完成了一端到另一端的单通。如果双方要互通，那么，两方都要通过 RTCPeerConnection 对象传输自己一端的数据，并从另一端接收数据。</p><p>以上，就是这幅图大体所描述的含义。而本文要重点介绍的内容就是 WebRTC 终端中的音视频采集部分。</p><h2>音视频采集基本概念</h2><p>在正式介绍 JavaScript 采集音视频数据的 API 之前，你还需要了解一些基本概念。这些概念虽然都不难理解，但在后面讲解API 时都会用到它们，很是重要，所以在这里我还是给你着重汇总和强调下。</p><ul>
+<li><strong>摄像头</strong>。用于捕捉（采集）图像和视频。</li>
+<li><strong>帧率</strong>。现在的摄像头功能已非常强大，一般情况下，一秒钟可以采集 30 张以上的图像，一些好的摄像头甚至可以采集 100 张以上。我们把<strong>摄像头一秒钟采集图像的次数称为帧率</strong>。帧率越高，视频就越平滑流畅。然而，在直播系统中一般不会设置太高的帧率，因为帧率越高，占的网络带宽就越多。</li>
+<li><strong>分辨率</strong>。摄像头除了可以设置帧率之外，还可以调整分辨率。我们常见的分辨率有 2K、1080P、720P、420P等。分辨率越高图像就越清晰，但同时也带来一个问题，即占用的带宽也就越多。所以，在直播系统中，分辨率的高低与网络带宽有紧密的联系。也就是说，分辨率会跟据你的网络带宽进行动态调整。</li>
+<li><strong>宽高比</strong>。分辨率一般分为两种宽高比，即 16:9 或 4:3。4:3的宽高比是从黑白电视而来，而 16:9的宽高比是从显示器而来。现在一般情况下都采用 16:9的比例。</li>
+<li><strong>麦克风</strong>。用于采集音频数据。它与视频一样，可以指定一秒内采样的次数，称为<strong>采样率</strong>。每个采样用几个bit表示，称为<strong>采样位深或采样大小</strong>。</li>
+<li><strong>轨（Track）</strong>。WebRTC 中的“轨”借鉴了多媒体的概念。火车轨道的特性你应该非常清楚，两条轨永远不会相交。“轨”在多媒体中表达的就是<strong>每条轨数据都是独立的，不会与其他轨相交</strong>，如 MP4 中的音频轨、视频轨，它们在 MP4 文件中是被分别存储的。</li>
+<li><strong>流（Stream）</strong>。可以理解为容器。在 WebRTC 中，“流”可以分为媒体流（MediaStream）和数据流（DataStream）。其中，<a href="https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia">媒体流</a>可以存放0个或多个音频轨或视频轨；数据流可以存0个或多个数据轨。</li>
+</ul><h2>音视频采集</h2><p>有了上面这些基本概念，你就可以很容易理解后面所要讲的内容了。接下来，就让我们来具体看看在浏览器下采集音视频的 API 格式以及如何控制音视频的采集吧。</p><h3>1. getUserMedia 方法</h3><p>在浏览器中访问音视频设备非常简单，只要调用<strong>getUserMedia</strong>这个 API 即可。该 API 的基本格式如下：</p><pre><code>var promise = navigator.mediaDevices.getUserMedia(constraints);
+</code></pre><p>它返回一个<strong>Promise</strong>对象。</p><ul>
+<li>如果<strong>getUserMedia</strong>调用成功，则可以通过 Promise 获得<strong>MediaStream</strong>对象，也就是说现在我们已经从音视频设备中获取到音视频数据了。</li>
+<li>如果调用失败，比如用户拒绝该 API 访问媒体设备（音频设备、视频设备），或者要访问的媒体设备不可用，则返回的 Promise 会得到 PermissionDeniedError 或 NotFoundError 等错误对象。</li>
+</ul><h3>2. MediaStreamConstraints 参数</h3><p>从上面的调用格式中可以看到，<strong>getUserMedia</strong>方法有一个输入参数<strong>constraints</strong>，其类型为 <strong>MediaStreamConstraints</strong>。它可以指定<strong>MediaStream</strong>中包含哪些类型的媒体轨（音频轨、视频轨），并且可为这些媒体轨设置一些限制。</p><p>下面我们就来详细看一下它包括哪些限制，这里我引用一下WebRTC 1.0 规范对 <a href="https://w3c.github.io/mediacapture-main/getusermedia.html#mediastreamconstraints">MediaStreamConstraints</a>的定义，其格式如下：</p><pre><code>dictionary MediaStreamConstraints {
+             (boolean or MediaTrackConstraints) video = false,
+             (boolean or MediaTrackConstraints) audio = false
+};
+</code></pre><p>从上面的代码中可以看出，该结构可以指定采集音频还是视频，或是同时对两者进行采集。</p><p>举个例子，比如你只想采集视频，则可以像下面这样定义 constraints：</p><pre><code>
+const mediaStreamContrains = {
+    video: true
+};
+
+</code></pre><p>或者，同时采集音视和视频：</p><pre><code>
+const mediaStreamContrains = {
+    video: true,
+    audio: true
+};
+
+</code></pre><p>其实，你还可以通过 MediaTrackConstraints 进一步对每一条媒体轨进行限制，比如下面的代码示例：</p><pre><code>const mediaStreamContrains = {
+    video: {
+        frameRate: {min: 20},
+  	    width: {min: 640, ideal: 1280},
+  	    height: {min: 360, ideal: 720},
+  		aspectRatio: 16/9
+    },
+    audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+    }
+};
+</code></pre><p>上面这个例子表示：视频的帧率最小 20 帧每秒；宽度最小是 640，理想的宽度是 1280；同样的，高度最小是 360，最理想高度是 720；此外宽高比是 16:9；对于音频则是开启回音消除、降噪以及自动增益功能。</p><p>除了上面介绍的这些参数来控制摄像头和麦克风外，当然还有其他一些参数可以设置，更详细的参数信息，可以跳到下面的<span class="orange">参考</span>部分。</p><p>通过上面的这些方式就可以很方便地控制音视频的设备了，是不是非常简单？</p><h2>如何使用 getUserMedia API</h2><p>接下来，我们看一下如何使用上面介绍的 API 来采集视频数据吧。</p><p>下面的HTML代码非常简单，它引入一段JavaScript代码用于捕获音视频数据，然后将采集到的音视频数据通过 video 标签播放出来。</p><pre><code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Realtime communication with WebRTC&lt;/title&gt;
+        &lt;link rel=&quot;stylesheet&quot;, href=&quot;css/client.css&quot; /&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Realtime communication with WebRTC &lt;/h1&gt;
+        &lt;video autoplay playsinline&gt;&lt;/video&gt;
+        &lt;script src=&quot;js/client.js&quot;&gt;&lt;/script&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</code></pre><p>为便于你更好地理解该部分的知识，上面这段代码中有两条代码我需要解释一下，一句是：</p><pre><code>&lt;video autoplay playsinline&gt;&lt;/video&gt;
+</code></pre><p>它是HTML5的视频标签，不仅可以播放多媒体文件，还可以用于播放采集到的数据。其参数含义如下：</p><ul>
+<li><strong>autoplay</strong>，表示当页面加载时可以自动播放视频；</li>
+<li><strong>playsinline</strong>，表示在HTML5页面内播放视频，而不是使用系统播放器播放视频。</li>
+</ul><p>另一句是:</p><pre><code>&lt;script src=&quot;js/client.js&quot;&gt;&lt;/script&gt;
+</code></pre><p>它引入了外部的 JavaScript 代码，起到的作用就是获取视频数据。具体代码如下：</p><pre><code>'use strict';
+
+const mediaStreamContrains = {
+    video: true
+};
+
+const localVideo = document.querySelector('video');
+
+function gotLocalMediaStream(mediaStream){
+    localVideo.srcObject = mediaStream;
+}
+
+function handleLocalMediaStreamError(error){
+    console.log('navigator.getUserMedia error: ', error);
+}
+
+navigator.mediaDevices.getUserMedia(mediaStreamContrains).then(
+    gotLocalMediaStream
+).catch(
+    handleLocalMediaStreamError
+);
+</code></pre><p>通过上面的代码，我们就可以采集到视频数据并将它展示在页面上了，很简单吧！接下来，我们来大体看一下它的逻辑。</p><p>JavaScript 代码中首先执行<strong>getUserMedia()</strong>方法，该方法会请求访问 Camera。如果是第一次请求 Camera，浏览器会向用户弹出提示窗口，让用户决定是否可以访问摄像头。如果用户允许访问，且设备可用，则调用 gotLocalMediaStream 方法。</p><p>在gotLocalMediaStream方法中，其输入参数为<strong>MediaStream</strong>对象，该对象中存放着<strong>getUserMedia</strong>方法采集到的音视频<strong>轨</strong>。我们将它作为视频源赋值给 HTML5 的 video 标签的 srcObject 属性。这样在 HTML 页面加载之后，就可以在该页面中看到摄像头采集到的视频数据了。</p><p>在这个例子中，<strong>getUserMedia</strong>方法的输入参数<strong>mediaStreamContraints</strong>限定了只采集视频数据。同样的，你也可以采集音频数据或同时采集音频和视频数据。</p><h2>小结</h2><p>在 WebRTC 中，<strong>MediaTrack</strong>和<strong>MediaStream</strong>这两个概念特别重要，后续学习 WebRTC的过程中，我们会反复用到，所以在这最开始你就要理解透这两个概念。举个例子，如果你想在一个房间里，同时共享视频、共享音频、共享桌面，该怎么做呢？如果你对 MediaTrack  和 MediaStream 真正理解了，就会觉得WebRTC处理这种情况太简单了。</p><p>另外，在本文中我重点介绍了<strong>getUserMedia</strong>这个API，<strong>它是 WebRTC 几个核心API之一，你必须熟练掌握它</strong>。因为通过它，你可以对音视频设备做各种各样的控制，例如，是采集音频，还是采集视频？视频的分辨率是多少？帧率是多少？音频的采样率是多少？</p><p>当然，特别关键的一点是可以通过该API开启<strong>回音消除</strong>。回音消除问题是所有做实时互动直播系统最难解决的问题之一。对于 JavaScript 开发同学来说，现在只需要调用该API时，将回音消除选项打开就可以了，一下子解决了世界难题。</p><p>最后，我还通过一个例子向你具体展示了视频采集后的效果。相信通过这些讲解和展示，你应该已经感受到目前浏览器的强大，以及它可以做更多、更有意思的音视频相关的事情了。</p><p>这里你也可以看一下我做出来的效果图（没有美颜）：</p><p><img src="https://static001.geekbang.org/resource/image/2a/4f/2a063c7520647f37e3a97a3558fff34f.png" alt=""></p><h2>思考时间</h2><p>上面我们一起学习了如何通过<strong>getUserMedia</strong>获取到音视频数据。而在真实的场景中，我们往往不但要获取到默认设备的音视频数据，还要能获取到<strong>某个指定的设备</strong>的音视频数据。比如，手机上一般都有两个摄像头——前置摄像头和后置摄像头。那么，你有没有办法采集到指定摄像头的视频数据呢？</p><p>欢迎在留言区与我分享你的想法，也欢迎你在留言区记录你的思考过程。感谢阅读，如果你觉得这篇文章对你有帮助的话，也欢迎把它分享给更多的朋友。</p><p>另外，为便于你更好地学习，我还做了个Demo，放在了<a href="https://github.com/avdance/webrtc_web/tree/master/01_mediastream">GitHub上（有需要可点这里）</a>。</p><h2><span class="orange">参考</span></h2><p>getUserMedia API 控制设备的参数及其含义如下：</p><p><img src="https://static001.geekbang.org/resource/image/f3/8a/f3d578d13b4c21c83b161dae348b8c8a.png" alt=""></p><p></p>

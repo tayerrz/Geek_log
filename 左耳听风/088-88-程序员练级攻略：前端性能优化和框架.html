@@ -1,0 +1,234 @@
+<h1>前端性能优化</h1><p>首先是推荐几本前端性能优化方面的图书。</p><ul>
+<li>
+<p><a href="http://www.allitebooks.in/web-performance-action/">Web Performance in Action</a> ，这本书目前国内没有卖的。你可以看电子版本，我觉得是一本很不错的书，其中有CSS、图片、字体、JavaScript性能调优等。</p>
+</li>
+<li>
+<p><a href="http://designingforperformance.com/">Designing for Performance</a> ，这本在线的电子书很不错，其中讲了很多网页优化的技术和相关的工具，可以让你对整体网页性能优化有所了解。</p>
+</li>
+<li>
+<p><a href="https://book.douban.com/subject/5362856/">High Performance JavaScript</a> ，这本书在国内可以买到，能让你了解如何提升各方面的性能，包括代码的加载、运行、DOM交互、页面生存周期等。雅虎的前端工程师尼古拉斯·扎卡斯（Nicholas C. Zakas）和其他五位JavaScript专家介绍了页面代码加载的最佳方法和编程技巧，来帮助你编写更为高效和快速的代码。你还会了解到构建和部署文件到生产环境的最佳实践，以及有助于定位线上问题的工具。</p>
+</li>
+<li>
+<p><a href="https://book.douban.com/subject/26411563/">High Performance Web Sites: Essential Knowledge for Front-End Engineers</a> ，这本书国内也有卖，翻译版为《高性能网站建设指南：前端工程师技能精髓》。作者给出了14条具体的优化原则，每一条原则都配以范例佐证，并提供了在线支持。</p>
+<p>全书内容丰富，主要包括减少HTTP请求、Edge Computing技术、Expires Header技术、gzip组件、CSS和JavaScript最佳实践、主页内联、Domain最小化、JavaScript优化、避免重定向的技巧、删除重复JavaScript的技巧、关闭ETags的技巧、Ajax缓存技术和最小化技术等。</p>
+</li>
+<li>
+<p>除了上面这几本书之外，Google的 <a href="https://developers.google.com/web/fundamentals/">Web Fundamentals</a> 里的 <a href="https://developers.google.com/web/fundamentals/performance/why-performance-matters/">Performance</a>  这一章节也有很多非常不错的知识和经验。</p>
+</li>
+</ul><!-- [[[read_end]]] --><p>接下来是一些最佳实践性的文档。</p><ul>
+<li>
+<p><a href="http://browserdiet.com/zh/">Browser Diet</a> ，前端权威性能指南（中文版）。这是一群为大型站点工作的专家们建立的一份前端性能的工作指南。</p>
+</li>
+<li>
+<p><a href="https://developers.google.com/speed/docs/insights/rules">PageSpeed Insights Rules</a> ，谷歌给的一份性能指南和最佳实践。</p>
+</li>
+<li>
+<p><a href="https://developer.yahoo.com/performance/rules.html">Best Practices for Speeding Up Your Web Site</a> ，雅虎公司给的一份7个分类共35个最佳实践的文档。</p>
+</li>
+</ul><p>接下来，重点推荐一个性能优化的案例学习网站 <a href="https://wpostats.com/">WPO Stats</a> 。WPO是Web Performance Optimization的缩写，这个网站上有很多很不错的性能优化的案例分享，一定可以帮助你很多。</p><p>然后是一些文章和案例。</p><ul>
+<li>
+<p><a href="http://blog.httpwatch.com/2015/01/16/a-simple-performance-comparison-of-https-spdy-and-http2/">A Simple Performance Comparison of HTTPS, SPDY and HTTP/2</a> ，这是一篇比较浏览器的HTTPS、SPDY和HTTP/2性能的文章，除了比较之外，还可以让你了解一些技术细节。</p>
+</li>
+<li>
+<p><a href="https://www.nginx.com/blog/7-tips-for-faster-http2-performance/">7 Tips for Faster HTTP/2 Performance</a> ，对于HTTP/2来说，Nginx公司给出的7个增加其性能的小提示。</p>
+</li>
+<li>
+<p><a href="https://slack.engineering/reducing-slacks-memory-footprint-4480fec7e8eb">Reducing Slack’s memory footprint</a> ，Slack团队减少内存使用量的实践。</p>
+</li>
+<li>
+<p><a href="https://medium.com/@Pinterest_Engineering/driving-user-growth-with-performance-improvements-cfc50dafadd7">Pinterest: Driving user growth with performance improvements</a> ，Pinterest关于性能调优的一些分享，其中包括了前后端的一些性能调优实践。其实也是一些比较通用的玩法，这篇文章主要是想让前端的同学了解一下如何做整体的性能调优。</p>
+</li>
+<li>
+<p><a href="http://jonraasch.com/blog/10-javascript-performance-boosting-tips-from-nicholas-zakas">10 JavaScript Performance Boosting Tips</a> ，10个提高JavaScript运行效率的小提示，挺有用的。</p>
+</li>
+<li>
+<p><a href="http://www.guypo.com/17-statistics-to-sell-web-performance-optimization/">17 Statistics to Sell Web Performance Optimization</a> ，这个网页上收集了好些公司的Web性能优化的工程分享，都是非常有价值的。</p>
+</li>
+<li>
+<p><a href="http://deanhume.com/Home/BlogPost/getting-started-with-the-picture-element/8109">Getting started with the Picture Element</a> ，这篇文章讲述了Responsive布局所带来的一些负面的问题。主要是图像适配的问题，其中引出了一篇文章"<a href="https://dev.opera.com/articles/native-responsive-images/">Native Responsive Images</a>" ，值得一读。</p>
+</li>
+<li>
+<p><a href="http://www.deanhume.com/Home/BlogPost/improve-page-load-times-with-dns-prefetching/80">Improve Page Load Times With DNS Prefetching</a> ，这篇文章教了你一个如何降低DNS解析时间的小技术——DNS prefetching。</p>
+</li>
+<li>
+<p><a href="http://www.html5rocks.com/en/tutorials/speed/rendering/">Jank Busting for Better Rendering Performance</a> ，这是一篇Google I/O上的分享，关于前端动画渲染性能提升。</p>
+</li>
+<li>
+<p><a href="https://developer.chrome.com/devtools/docs/javascript-memory-profiling">JavaScript Memory Profiling</a> ，这是一篇谷歌官方教你如何使用Chrome的开发工具来分析JavaScript内存问题的文章。</p>
+</li>
+</ul><p>接下来是一些性能工具。在线性能测试分析工具太多，这里只推荐比较权威的。</p><ul>
+<li>
+<p><a href="https://developers.google.com/speed/pagespeed/">PageSpeed</a> ，谷歌有一组PageSpeed工具来帮助你分析和优化网站的性能。Google出品的，质量相当有保证。</p>
+</li>
+<li>
+<p><a href="https://github.com/marcelduran/yslow">YSlow</a> ，雅虎的一个网页分析工具。</p>
+</li>
+<li>
+<p><a href="https://gtmetrix.com/">GTmetrix</a>	，是一个将PageSpeed和YSlow合并起来的一个网页分析工具，并且加上一些Page load或是其它的一些分析。也是一个很不错的分析工具。</p>
+</li>
+<li>
+<p><a href="https://github.com/davidsonfellipe/awesome-wpo">Awesome WPO</a> ，在GitHub上的这个Awesome中，你可以找到更多的性能优化工具和资源。</p>
+</li>
+</ul><p>另外，中国的网络有各种问题（你懂的），所以，你不能使用Google共享的JavaScript链接来提速，你得用中国自己的。你可以到这里看看中国的共享库资源，<a href="http://chineseseoshifu.com/blog/china-hosted-javascript-libraries-jquery-dojo-boostrap.html">Forget Google and Use These Hosted JavaScript Libraries in China</a> 。</p><h1>前端框架</h1><p>接下来，要学习的是Web前端的几大框架。目前而言，前端社区有三大框架Angular.js、React.js和Vue.js。我认为，React和Vue更为强劲一些，所以，我这里只写和React和Vue相关的攻略。关于两者的比较，网上有好多文章。我这里推荐几篇我觉得还不错的，供你参考。</p><ul>
+<li><a href="https://medium.com/unicorn-supplies/angular-vs-react-vs-vue-a-2017-comparison-c5c52d620176">Angular vs. React vs. Vue: A 2017 comparison</a></li>
+<li><a href="https://medium.com/js-dojo/react-or-vue-which-javascript-ui-library-should-you-be-using-543a383608d">React or Vue: Which JavaScript UI Library Should You Be Using?</a></li>
+<li><a href="https://medium.com/@TechMagic/reactjs-vs-angular5-vs-vue-js-what-to-choose-in-2018-b91e028fa91d">ReactJS vs Angular5 vs Vue.js - What to choose in 2018?</a></li>
+</ul><p>其实，比较这些框架的优缺点还有利弊并不是要比出个输赢，而是让你了解一下不同框架的优缺点。我觉得，这些框架都是可以学习的。而在我们生活工作中具体要用哪个框架，最好还是要有一些出发点，比如，你是为了找份好的工作，为了快速地搭一个网站，为了改造一个大规模的前端系统，还是纯粹地为了学习……</p><p>不同的目的会导致不同的决定。我并不希望上述的这些比较会让你进入“二选一”或是“三选一”的境地。我只是想通过这些文章让你知道这些框架的设计思路和实现原理，这些才是让你受益一辈子的事。</p><h2>React.js框架</h2><p>下面先来学习一下React.js框架。</p><p><strong>入门</strong></p><p>React学起来并不复杂，就看 <a href="https://reactjs.org/tutorial/tutorial.html">React 官方教程</a> 和其文档就好了（ <a href="https://doc.react-china.org/">React 的中文教程</a> ）。</p><p>然后，下面的文章会带你了解一下React.js的基本原理。</p><ul>
+<li>
+<p><a href="https://medium.freecodecamp.org/all-the-fundamental-react-js-concepts-jammed-into-this-single-medium-article-c83f9b53eac2">All the fundamental React.js concepts</a> ，这篇文章讲了所有的React.js的基本原理。</p>
+</li>
+<li>
+<p><a href="https://blog.kentcdodds.com/learn-react-fundamentals-and-advanced-patterns-eac90341c9db">Learn React Fundamentals and Advanced Patterns</a> ，这篇文章中有几个短视频，每个视频不超过5分钟，是学习React的一个很不错的地方。</p>
+</li>
+<li>
+<p><a href="https://reactjs.org/docs/thinking-in-react.html">Thinking in React</a>，这篇文章将引导你完成使用React构建可搜索产品数据表的思考过程。</p>
+</li>
+</ul><p><strong>提高</strong></p><p>学习一个技术最重要的是要学到其中的思想和方法。下面是一些我觉得学习React中最重要的东西。</p><ul>
+<li>
+<p><strong>状态</strong>，对于富客户端来说是非常麻烦也是坑最多的地方，这里有几篇文章你可以一读。</p>
+<ul>
+<li>
+<p><a href="http://reactkungfu.com/2015/09/common-react-dot-js-mistakes-unneeded-state/">Common React.js mistakes: Unneeded state</a> ，React.js编程的常见错误——不必要的状态。</p>
+</li>
+<li>
+<p><a href="https://www.reddit.com/r/reactjs/comments/3bjdoe/state_is_an_antipattern/">State is an Anti-Pattern</a> ，关于如何做一个不错的组件的思考，很有帮助。</p>
+</li>
+<li>
+<p><a href="https://www.safaribooksonline.com/blog/2015/10/29/react-local-component-state/">Why Local Component State is a Trap</a> ，一些关于 “Single state tree” 的想法。</p>
+</li>
+<li>
+<p><a href="https://daveceddia.com/thinking-statefully/">Thinking Statefully</a> ，几个很不错的例子让你对声明式有状态的技术有更好的理解。</p>
+</li>
+<li>
+<p>传统上，解决React的状态问题一般用Redux。在这里推荐 <a href="https://www.robinwieruch.de/tips-to-learn-react-redux/">Tips to learn React + Redux in 2018</a> 。Redux是一个状态粘合组件，一般来说，我们会用Redux来做一些数据状态和其上层Component上的同步。这篇教程很不错。</p>
+</li>
+<li>
+<p>最后是 "State Architecture Patterns in React " 系列文章，非常值得一读。</p>
+<ul>
+<li><a href="https://medium.com/@skylernelson_64801/state-architecture-patterns-in-react-a-review-df02c1e193c6">Part 1: A Review</a></li>
+<li><a href="https://medium.com/@skylernelson_64801/state-architecture-patterns-in-react-part-2-the-top-heavy-architecture-flux-and-performance-a388b928ce89">Part 2: The Top-Heavy Architecture, Flux and Performance</a></li>
+<li><a href="https://medium.com/@skylernelson_64801/state-architecture-patterns-in-react-part-3-articulation-points-zine-and-an-overall-strategy-cf076f906391">Part 3: Articulation Points, zine and An Overall Strategy</a></li>
+<li><a href="https://medium.com/@skylernelson_64801/state-architecture-patterns-in-react-part-4-purity-flux-duality-and-dataflow-d06016b3379a">Part 4: Purity, Flux-duality and Dataflow</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>函数式编程</strong>。从jQuery过来的同学一定非常不习惯React，而从Java等后端过来的程序员就会很习惯了。所以，我觉得React就是后端人员开发的，或者说是做函数式编程的人开发的。对此，你需要学习一下JavaScript函数式编程的东西。</p>
+<p>这里推荐一本免费的电子书 《<a href="https://github.com/MostlyAdequate/mostly-adequate-guide">Professor Frisby’s Mostly Adequate Guide to Functional Programming</a>》，其中译版为《<a href="https://jigsawye.gitbooks.io/mostly-adequate-guide/content/">JS函数式编程指南中文版</a>》。</p>
+<p>下面有几篇文章非常不错。前两篇和函数式编程有关的文章非常值得一读。后三篇是一些比较实用的函数式编程和React结合的文章。</p>
+<ul>
+<li><a href="https://medium.com/javascript-scene/master-the-javascript-interview-what-is-functional-programming-7f218c68b3a0?utm_source=mybridge&amp;utm_medium=email&amp;utm_campaign=read_more">Master the JavaScript Interview: What is Functional Programming?</a></li>
+<li><a href="https://medium.com/javascript-scene/the-rise-and-fall-and-rise-of-functional-programming-composable-software-c2d91b424c8c">The Rise and Fall and Rise of Functional Programming (Composing Software)</a></li>
+<li><a href="https://blog.risingstack.com/functional-ui-and-components-as-higher-order-functions/">Functional UI and Components as Higher Order Functions</a></li>
+<li><a href="http://banderson.github.io/functional-js-reverse-engineering-the-hype/">Functional JavaScript: Reverse-Engineering the Hype</a></li>
+<li><a href="https://medium.com/javascript-inside/some-thoughts-on-function-components-in-react-cb2938686bc7">Some Thoughts on Function Components in React</a></li>
+</ul>
+</li>
+<li>
+<p><strong>设计相关</strong>。接下来是学习一些React的设计模式。<a href="https://reactpatterns.com/">React Pattern</a> 是一个不错的学习React模式的地方。除此之外，还有如下的一些不错的文章也会对你很有帮助的。</p>
+<ul>
+<li><a href="https://medium.com/@franleplant/react-higher-order-components-in-depth-cf9032ee6c3e">React Higher Order Components in depth</a></li>
+<li><a href="https://medium.com/@dan_abramov/smart-and-dumb-components-7ca2f9a7c7d0">Presentational and Container Components</a></li>
+<li><a href="https://goshakkk.name/controlled-vs-uncontrolled-inputs-react/">Controlled and uncontrolled form inputs in React don’t have to be complicated</a></li>
+<li><a href="https://medium.com/merrickchristensen/function-as-child-components-5f3920a9ace9">Function as Child Components</a></li>
+<li><a href="https://medium.com/styled-components/component-folder-pattern-ee42df37ec68">Writing Scalable React Apps with the Component Folder Pattern</a></li>
+<li><a href="https://medium.freecodecamp.org/reusable-web-application-strategies-d51517ea68c8">Reusable Web Application Strategies</a></li>
+<li><a href="https://medium.com/@robftw/characteristics-of-an-ideal-react-architecture-883b9b92be0b">Characteristics of an Ideal React Architecture</a></li>
+</ul>
+</li>
+<li>
+<p><strong>实践和经验</strong></p>
+</li>
+</ul><p>还有一些不错的实践和经验。</p><ul>
+<li><a href="https://camjackson.net/post/9-things-every-reactjs-beginner-should-know">9 things every React.js beginner should know</a></li>
+<li><a href="https://engineering.siftscience.com/best-practices-for-building-large-react-applications/">Best practices for building large React applications</a></li>
+<li><a href="https://americanexpress.io/clean-code-dirty-code/">Clean Code vs. Dirty Code: React Best Practices</a></li>
+<li><a href="https://dev.to/jakoblind/how-to-become-a-more-productive-react-developer">How to become a more productive React Developer</a></li>
+<li><a href="https://medium.freecodecamp.org/8-key-react-component-decisions-cc965db11594">8 Key React Component Decisions</a></li>
+</ul><p><strong>资源列表</strong></p><p>最后就是React的资源列表。</p><ul>
+<li>
+<p><a href="https://github.com/enaqx/awesome-react">Awesome React</a> ，这是一些React相关资源的列表，很大很全。</p>
+</li>
+<li>
+<p><a href="https://github.com/markerikson/react-redux-links">React/Redux Links</a> ，这也是React相关的资源列表，与上面不一样的是，这个列表主要收集了大量的文章，其中讲述了很多React知识和技术，比上面的列表好很多。</p>
+</li>
+<li>
+<p><a href="https://react.rocks/">React Rocks</a> ，这个网站主要收集各种React的组件示例，可以让你大开眼界。</p>
+</li>
+</ul><h2>Vue.js框架</h2><p>Vue可能是一个更符合前端工程师习惯的框架。不像React.js那样使用函数式编程方式，是后端程序员的思路。</p><ul>
+<li>
+<p>通过文章 “<a href="https://medium.com/vue-mastery/why-43-of-front-end-developers-want-to-learn-vue-js-7f23348bc5be">Why 43% of Front-End Developers want to learn Vue.js</a>” ，你可以看出其编程方式和React是大相径庭的，符合传统的前端开发的思维方式。</p>
+</li>
+<li>
+<p>通过文章 <a href="https://www.smashingmagazine.com/2018/02/jquery-vue-javascript/">Replacing jQuery With Vue.js: No Build Step Necessary</a> ，我们可以看到，从jQuery是可以平滑过渡到Vue的。</p>
+</li>
+<li>
+<p>另外，我们可以通过 “<a href="https://medium.com/@dalaidunc/10-things-i-love-about-vue-505886ddaff2">10 things I love about Vue</a>” ，了解Vue的一些比较优秀的特性。</p>
+</li>
+</ul><p>最令人高兴的是，Vue的作者是我的好朋友尤雨溪（Evan You），最近一次对他的采访 “<a href="https://blog.hackages.io/https-blog-hackages-io-evanyoubhack2017-cc5559806157">Vue on 2018 - Interview with Evan You</a>” 当中有很多故事以及对Vue的展望。（<strong>注意：Vue是完全由其支持者和用户资助的，这意味着它更接近社区而不受大公司的控制。</strong>）</p><p>要学习Vue并不难，我认为上官网看文档（ <a href="http://vuejs.org/guide/">Vue 官方文档</a>（<a href="https://cn.vuejs.org/v2/guide/">中文版</a>）），照着搞一搞就可以很快上手了。<a href="https://laracasts.com/series/learn-vue-2-step-by-step">Vue.js screencasts</a> 是一个很不错的英文视频教程。</p><p>另外，推荐 <a href="https://zhuanlan.zhihu.com/p/23134551">新手向：Vue 2.0的建议学习顺序</a> ，这是Vue作者写的，所以有特殊意义。</p><p>Vue的确比较简单，有Web开发经验的人上手也比较快，所以这里也不会像React那样给出很多的资料。下面是一些我觉得还不错的内容，推荐给你。</p><ul>
+<li>
+<p><a href="https://itnext.io/how-not-to-vue-18f16fe620b5">How not to Vue</a> ，任何技术都有坑，了解Vue的短板，你就能扬长避短，就能用得更好。</p>
+</li>
+<li>
+<p><a href="https://alligator.io/vuejs/component-communication/">Vue.js Component Communication Patterns</a></p>
+</li>
+<li>
+<p><a href="https://medium.com/js-dojo/4-ajax-patterns-for-vue-js-apps-add915fc9168">4 AJAX Patterns For Vue.js Apps</a></p>
+</li>
+<li>
+<p><a href="https://vuejsdevelopers.com/2017/05/20/vue-js-safely-jquery-plugin/">How To (Safely) Use A jQuery Plugin With Vue.js</a></p>
+</li>
+<li>
+<p><a href="https://vuejsdevelopers.com/2017/03/24/vue-js-component-templates/">7 Ways To Define A Component Template in Vue.js</a></p>
+</li>
+<li>
+<p><a href="https://vuejsdevelopers.com/2017/04/22/vue-js-libraries-plugins/">Use Any Javascript Library With Vue.js</a></p>
+</li>
+<li>
+<p><a href="https://lobotuerto.com/blog/dynamic-and-async-components-made-easy-with-vuejs/">Dynamic and async components made easy with Vue.js</a></p>
+</li>
+</ul><p>当然，最后一定还有 <a href="https://github.com/vuejs/awesome-vue">Awesome Vue</a> ，Vue.js里最为巨大最为优秀的资源列表。</p><h1>小结</h1><p>总结一下今天的内容。我先介绍的是前端性能优化方面的内容，推荐了图书、最佳实践性的文档、案例，以及一些在线性能测试分析工具。随后重点讲述了React和Vue两大前端框架，给出了大量的文章、教程和相关资源列表。我认为，React.js使用函数式编程方式，更加符合后端程序员的思路，而Vue是更符合前端工程师习惯的框架。因此，两者比较起来，Vue会更容易上手一些。</p><p>下篇文章，我们将讲述前端工程师的一个基本功——UI/UX设计。敬请期待。</p><p>下面是《程序员练级攻略》系列文章的目录。</p><ul>
+<li><a href="https://time.geekbang.org/column/article/8136">开篇词</a></li>
+<li>入门篇
+<ul>
+<li><a href="https://time.geekbang.org/column/article/8216">零基础启蒙</a></li>
+<li><a href="https://time.geekbang.org/column/article/8217">正式入门</a></li>
+</ul>
+</li>
+<li>修养篇
+<ul>
+<li><a href="https://time.geekbang.org/column/article/8700">程序员修养</a></li>
+</ul>
+</li>
+<li>专业基础篇
+<ul>
+<li><a href="https://time.geekbang.org/column/article/8701">编程语言</a></li>
+<li><a href="https://time.geekbang.org/column/article/8887">理论学科</a></li>
+<li><a href="https://time.geekbang.org/column/article/8888">系统知识</a></li>
+</ul>
+</li>
+<li>软件设计篇
+<ul>
+<li><a href="https://time.geekbang.org/column/article/9369">软件设计</a></li>
+</ul>
+</li>
+<li>高手成长篇
+<ul>
+<li><a href="https://time.geekbang.org/column/article/9759">Linux系统、内存和网络（系统底层知识）</a></li>
+<li><a href="https://time.geekbang.org/column/article/9851">异步I/O模型和Lock-Free编程（系统底层知识）</a></li>
+<li><a href="https://time.geekbang.org/column/article/10216">Java底层知识</a></li>
+<li><a href="https://time.geekbang.org/column/article/10301">数据库</a></li>
+<li><a href="https://time.geekbang.org/column/article/10603">分布式架构入门（分布式架构）</a></li>
+<li><a href="https://time.geekbang.org/column/article/10604">分布式架构经典图书和论文（分布式架构）</a></li>
+<li><a href="https://time.geekbang.org/column/article/11232">分布式架构工程设计(分布式架构)</a></li>
+<li><a href="https://time.geekbang.org/column/article/11116">微服务</a></li>
+<li><a href="https://time.geekbang.org/column/article/11665">容器化和自动化运维</a></li>
+<li><a href="https://time.geekbang.org/column/article/11669">机器学习和人工智能</a></li>
+<li><a href="https://time.geekbang.org/column/article/12271">前端基础和底层原理（前端方向）</a></li>
+<li><a href="https://time.geekbang.org/column/article/12389">前端性能优化和框架（前端方向）</a></li>
+<li><a href="https://time.geekbang.org/column/article/12486">UI/UX设计（前端方向）</a></li>
+<li><a href="https://time.geekbang.org/column/article/12561">技术资源集散地</a></li>
+</ul>
+</li>
+</ul><p></p>

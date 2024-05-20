@@ -1,0 +1,456 @@
+<p><span class="reference"></span><span class="reference"></span>专栏主体内容已经结束了，在专栏写作的过程中，我阅读了很多业界公开的资料，我觉得有必要整理出来，供想深入阅读的人继续去找虐。</p>
+<p>整体来说，在选择参考文献时，我偏爱那些由公司发表的。因为推荐系统本质上还是一种非常依赖实践的算法应用方向，并且，这些商业公司论文中的技术内容也在他们实际的场景中经过了检验。</p>
+<p>另外，更多的内容是来自我自己的大脑中，所以我在下面列出来的只是一部分，在经过反复删减之后，保留了这些，有中文有英文，一般来说英文居多。有较理论化的，如优化理论，更多的是较实践派，可以学完即用。这些资料分成这么几个类型。</p>
+<ol>
+<li>论文：以论文形式发表的，期刊数据库中可以下载到。</li>
+<li>网络文章：就是在网上自由流传的内容或者博客，为了方便阅读，我将它们保存为PDF格式。</li>
+<li>演示文稿：就是作者曾公开演讲过的内容，相对来说不是那么严谨，但是更容易理解。</li>
+<li>书：推荐系统相关的书较少，我在专栏中参考过的书只有一本（附件中不提供书的电子文档）。</li>
+</ol>
+<p>以上的参考文献我按照章节顺序列在了下面，我还在后面附上一个推荐书单。你可以点击查看。</p>
+<h2>原理篇</h2>
+<h2>1.内容推荐</h2>
+<ul>
+<li>
+<h3>题目：Bag of Tricks for Efficient Text Classification</h3>
+</li>
+</ul>
+<h3><strong>类型</strong>：论文</h3>
+<h3><strong>作者</strong>：Facebook</h3>
+<h3><strong>说明</strong>：</h3>
+<p><span class="reference">Facebook开源的文本处理工具fastText背后原理。可以训练词嵌入向量，文本多分类，效率和线性模型一样，效果和深度学习一样，值得拥有。</span></p>
+<ul>
+<li>
+<h3><strong>题目</strong>：The Learning Behind Gmail Priority Inbox</h3>
+</li>
+</ul>
+<h3><strong>类型</strong>：论文</h3>
+<h3><strong>作者</strong>：Google</h3>
+<h3><strong>说明</strong>：</h3>
+<p><span class="reference">介绍了一种基于文本和行为给用户建模的思路，是信息流推荐的早期探索，Gmail智能邮箱背后的原理。</span></p>
+<ul>
+<li>
+<h3><strong>题目</strong>：Recommender Systems Handbook(第三章，第九章)</h3>
+</li>
+</ul>
+<h3><strong>类型</strong>：书</h3>
+<h3><strong>作者</strong>：Francesco Ricci等</h3>
+<h3><strong>说明</strong>：</h3>
+<p><span class="reference">这本书收录了推荐系统很多经典论文，话题涵盖非常广，第三章专门讲内容推荐的基本原理，第九章是一个具体的基于内容推荐系统的案例。</span></p>
+<ul>
+<li>
+<h3><strong>题目</strong>：文本上的算法</h3>
+</li>
+</ul>
+<h3><strong>类型</strong>：网络文章(网络免费版，已有成书《文本上的算法:深入浅出自然语言处理》，内容更丰富)</h3>
+<h3><strong>作者</strong>：路彦雄</h3>
+<h3><strong>说明</strong>：</h3>
+<p><span class="reference">介绍了文本挖掘中常用的算法，及基础概念。内容涉及概率论，信息论，文本分类，聚类，深度学习，推荐系统等。</span></p>
+<ul>
+<li>
+<h3>题目：LDA数学八卦</h3>
+</li>
+</ul>
+<h3>类型：网络文章</h3>
+<h3>作者：Rickjin(@靳志辉)</h3>
+<h3>说明：</h3>
+<p><span class="reference">由浅入深地讲解LDA原理，对于实际LDA工具的使用有非常大的帮助。</span></p>
+<h2>2.近邻推荐</h2>
+<ul>
+<li>
+<h3>题目：Amazon.com recommendations: item-to-item collaborative filtering</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Amazon</h3>
+<h3>说明：</h3>
+<p><span class="reference">介绍Amazon的推荐系统原理，主要是介绍Item-Based协同过滤算法。</span></p>
+<ul>
+<li>
+<h3>题目：Slope One Predictors for Online Rating-Based Collaborative Filtering</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Daniel Lemire等</h3>
+<h3>说明：</h3>
+<p><span class="reference">Slope One算法。</span></p>
+<ul>
+<li>
+<h3>题目：Item-Based Collaborative Filtering Recommendation Algorithms</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Badrul Sarwar等</h3>
+<h3>说明：</h3>
+<p><span class="reference">GroupLens的研究团队对比了不同的Item-to-Item的推荐算法。</span></p>
+<ul>
+<li>
+<h3>题目：Collaborative Recommendations Using Item-to-Item Similarity Mappings</h3>
+</li>
+</ul>
+<h3>类型：专利</h3>
+<h3>作者：Amazon</h3>
+<h3>说明：</h3>
+<p><span class="reference">是的，Amazon申请了Item-Based算法的专利，所以如果在美上市企业，小心用这个算法。</span></p>
+<ul>
+<li>
+<h3>题目：Recommender Systems Handbook（第4章）</h3>
+</li>
+</ul>
+<h3>类型：书</h3>
+<h3>作者：Francesco Ricci等</h3>
+<h3>说明：</h3>
+<p><span class="reference">第四章综述性地讲了近邻推荐，也就是基础协同过滤算法。</span></p>
+<h2>3.矩阵分解</h2>
+<ul>
+<li>
+<h3>题目：Matrix Factorization and Collaborative Filtering</h3>
+</li>
+</ul>
+<h3>类型：演示文稿</h3>
+<h3>作者：Daryl Lim</h3>
+<h3>说明：</h3>
+<p><span class="reference">从PCA这种传统的数据降维方法讲起，综述了矩阵分解和协同过滤算法。矩阵分解也是一种降维方法。</span></p>
+<ul>
+<li>
+<h3>题目：Factorization Meets the Neighborhood: a Multifaceted Collaborative Filtering Model</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Yehuda Koren</h3>
+<h3>说明：</h3>
+<p><span class="reference">把矩阵分解和近邻模型融合在一起。</span></p>
+<ul>
+<li>
+<h3>题目：BPR- Bayesian Personalized Ranking from Implicit Feedback</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Steffen Rendle等</h3>
+<h3>说明：</h3>
+<p><span class="reference">更关注推荐结果的排序好坏，而不是评分预测精度，那么BPR模型可能是首选，本篇是出处。</span></p>
+<ul>
+<li>
+<h3>题目：Collaborative Filtering for Implicit Feedback Datasets</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Yifan Hu等</h3>
+<h3>说明：</h3>
+<p><span class="reference">不同于通常矩阵分解处理的都是评分数据这样的显式反馈，本文介绍一种处理点击等隐式反馈数据的矩阵分解模型。</span></p>
+<ul>
+<li>
+<h3>题目：Matrix Factorization Techniques For Recommender Systems</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Yehuda Koren等</h3>
+<h3>说明：</h3>
+<p><span class="reference">本文是大神Yehuda Koren对矩阵分解在推荐系统中的应用做的一个普及性介绍，值得一读。</span></p>
+<ul>
+<li>
+<h3>题目：The BellKor Solution to the Netflix Grand Prize</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Yehuda Koren</h3>
+<h3>说明：</h3>
+<p><span class="reference">也是一篇综述，或者说教程，针对Netflix Prize的。</span></p>
+<h2>4.模型融合</h2>
+<ul>
+<li>
+<h3>题目：Adaptive Bound Optimization for Online Convex Optimization</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Google</h3>
+<h3>说明：</h3>
+<p><span class="reference">FTRL是CTR预估常用的优化算法，本文介绍FTRL算法原理。</span></p>
+<ul>
+<li>
+<h3>题目：在线最优化求解</h3>
+</li>
+</ul>
+<h3>类型：网络文章</h3>
+<h3>作者：冯扬</h3>
+<h3>说明：</h3>
+<p><span class="reference">是对FTRL的通俗版解说。</span></p>
+<ul>
+<li>
+<h3>题目：Ad Click Prediction: a View from the Trenches</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Google</h3>
+<h3>说明：</h3>
+<p><span class="reference">FTRL工程实现解读。</span></p>
+<ul>
+<li>
+<h3>题目：Factorization Machines</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Steffen Rendle</h3>
+<h3>说明：</h3>
+<p><span class="reference">提出FM模型的论文，FM用于CTR预估。</span></p>
+<ul>
+<li>
+<h3>题目：Field-aware Factorization Machines for CTR Prediction</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Yuchin Juan</h3>
+<h3>说明：</h3>
+<p><span class="reference">FFM模型，用于CTR预估。</span></p>
+<ul>
+<li>
+<h3>题目：Practical Lessons from Predicting Clicks on Ads at Facebook</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>说明：</h3>
+<p><span class="reference">提出了LR + GBDT的CTR预估模型。</span></p>
+<ul>
+<li>
+<h3>题目：Wide &amp; Deep Learning for Recommender Systems</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Google</h3>
+<h3>说明：</h3>
+<p><span class="reference">提出融合深度和宽度模型的</span>Wide&amp;Deep模型，用于CTR预估。</p>
+<h2>5.Bandit算法</h2>
+<ul>
+<li>
+<h3>题目：Introduction to Bandits- Algorithms and Theory Part 1- Bandits with small sets of actions</h3>
+</li>
+</ul>
+<h3>类型：演示文稿</h3>
+<h3>作者：Jean-Yves Audibert等</h3>
+<h3>说明：</h3>
+<p><span class="reference">介绍bandit算法概念，理论和算法，这部分主要针对小的选项候选集。</span></p>
+<ul>
+<li>
+<h3>题目：Introduction to Bandits- Algorithms and Theory Part 2- Bandits with large sets of actions</h3>
+</li>
+</ul>
+<h3>类型：演示文稿</h3>
+<h3>作者：Jean-Yves Audibert等</h3>
+<h3>说明：</h3>
+<p><span class="reference">介绍Bandit算法概念，理论和算法，这部分主要针对较大的选项候选集。</span></p>
+<ul>
+<li>
+<h3>题目：A Contextual-Bandit Approach to Personalized News Article Recommendation</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Yahoo</h3>
+<h3>说明：</h3>
+<p><span class="reference">Linucb的原始论文，考虑上下文的Bandit算法。</span></p>
+<ul>
+<li>
+<h3>题目：Collaborative Filtering Bandits</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Shuai Li等</h3>
+<h3>说明：</h3>
+<p><span class="reference">Bandit 算法与协同过滤结合，提出COFIBA算法。</span></p>
+<h2>6.深度学习</h2>
+<ul>
+<li>
+<h3>题目：Deep Neural Networks for YouTube Recommendations</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Google</h3>
+<h3>说明：</h3>
+<p><span class="reference">介绍YouTube视频推荐系统在深度神经网络上的尝试。能从中看到wide&amp;deep模型的影子。</span></p>
+<ul>
+<li>
+<h3>题目：Efficient Estimation of Word Representations in Vector Space</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Google</h3>
+<h3>说明：</h3>
+<p><span class="reference">Word2Vec的作者在这篇文章中提出了一种词嵌入向量学习方法，也就是把开源工具包Word2Vec背后的模型详细介绍了一次。理论上很简单，更多是一些工程技巧的分享。Word2Vec给推荐系统带来了一种新的隐因子向量学习方法，深陷评分预测泥潭的矩阵分解被开拓了思路。</span></p>
+<ul>
+<li>
+<h3>题目：Item2Vec: Neural Item Embedding for Collaborative Filtering</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Microsoft</h3>
+<h3>说明：</h3>
+<p><span class="reference">这篇就是借鉴了word2vec在语言建模中的思路，为推荐系统的行为建模，从中为物品学习嵌入向量。</span></p>
+<ul>
+<li>
+<h3>题目：Learning Representations of Text using Neural Networks</h3>
+</li>
+</ul>
+<h3>类型：演示文稿</h3>
+<h3>作者：Google</h3>
+<h3>说明：</h3>
+<p><span class="reference">理解为word2vec作者写一个教程。</span></p>
+<ul>
+<li>
+<h3>题目：Long Short-Term Memory</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Sepp Hochreiter等</h3>
+<h3>说明：</h3>
+<p><span class="reference">可以用来为序列建模的LSTM，实际上在1997年就发表论文了，只是在十几年后才大火。</span></p>
+<ul>
+<li>
+<h3>题目：An Empirical Exploration of Recurrent Network Architectures</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Google</h3>
+<h3>说明：</h3>
+<p><span class="reference">Google在RNN模型使用上的经验分享。</span></p>
+<ul>
+<li>
+<h3>题目：Recurrent Neural Networks for Collaborative Filtering</h3>
+</li>
+</ul>
+<h3>类型：网络文章</h3>
+<h3>作者：Erik Bernhardsson</h3>
+<h3>说明：</h3>
+<p><span class="reference">这是Erik Bernhardsson在Spotify期间所做的尝试，用RNN自动构建音乐播单。Erik Bernhardsson还有一项开源项目Annoy，用于稠密向量的近邻搜索，在推荐系统中也用得较多。</span></p>
+<h2>7.其他实用算法</h2>
+<ul>
+<li>
+<h3>题目：Detecting Near-Duplicates for Web Crawling</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Google</h3>
+<h3>说明：</h3>
+<p><span class="reference">在这篇论文中提出了simhash算法，用于大规模网页去重。</span></p>
+<ul>
+<li>
+<h3>题目：Weighted Random Sampling over Data Streams</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Pavlos S. Efraimidis</h3>
+<h3>说明：</h3>
+<p><span class="reference">对流式数据的加权采样。</span></p>
+<ul>
+<li>
+<h3>题目：Weighted Sampling Without Replacement from Data Streams</h3>
+</li>
+</ul>
+<h3>类型：论文：</h3>
+<h3>作者：Vladimir Braverman等</h3>
+<h3>说明：</h3>
+<p><span class="reference">介绍了两种对流式数据的加权采样。</span></p>
+<!-- [[[read_end]]] -->
+<h2>工程篇</h2>
+<h2>1.常见架构</h2>
+<ul>
+<li>
+<h3>题目：Activity Feeds Architecture</h3>
+</li>
+</ul>
+<h3>类型：演示文稿</h3>
+<h3>作者：Etsy</h3>
+<h3>说明：</h3>
+<p><span class="reference">本文非常详细地介绍了社交动态信息流的架构设计细节。</span></p>
+<ul>
+<li>
+<h3>题目：Atom Activity Streams 1.0</h3>
+</li>
+</ul>
+<h3>类型：规范文档</h3>
+<h3>作者：Activity Streams Working Group</h3>
+<h3>说明：</h3>
+<p><span class="reference">这是一份动态信息流数据模型的协议规范文档，由Activity Streams Working Group共同发出，这个组织包含Google和Microsoft。</span></p>
+<ul>
+<li>
+<h3>题目：Beyond the 5 stars（Netflix Recommendations）</h3>
+</li>
+</ul>
+<h3>类型：网络文章</h3>
+<h3>作者：Netflix</h3>
+<h3>说明：</h3>
+<p><span class="reference">Netflix详细宏观上介绍了自家推荐系统的产品形态，不只是比赛中的评分预测那么简单的。</span></p>
+<ul>
+<li>
+<h3>题目：System Architectures for Personalization and Recommendation</h3>
+</li>
+</ul>
+<h3>类型：网络文章</h3>
+<h3>作者：Netflix</h3>
+<h3>说明：</h3>
+<p><span class="reference">Netflix 推荐系统的架构介绍。</span></p>
+<ul>
+<li>
+<h3>题目：Information Seeking-Convergence of Search, Recommendations and Advertising</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：H Garcia-Molina等</h3>
+<h3>说明：</h3>
+<p><span class="reference">探讨搜索、推荐、广告三者架构统一。</span></p>
+<h2>2.关键模块</h2>
+<ul>
+<li>
+<h3>题目：Overlapping Experiment Infrastructure- More, Better, Faster Experimentation</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：Google</h3>
+<h3>说明：</h3>
+<p><span class="reference">ABTest实验平台的扛鼎之作，Google出品，值得拥有。</span></p>
+<ul>
+<li>
+<h3>题目：TencentRec：Real-time Stream Recommendation in Practice</h3>
+</li>
+</ul>
+<h3>类型：论文</h3>
+<h3>作者：腾讯</h3>
+<h3>说明：</h3>
+<p><span class="reference">介绍了腾讯内部的实时推荐系统架构。</span></p>
+<ul>
+<li>
+<h3>题目：Personalization at Spotify using Cassandra</h3>
+</li>
+</ul>
+<h3>类型：网络文章</h3>
+<h3>作者：Spotify</h3>
+<h3>说明：</h3>
+<p><span class="reference">介绍了Spotify在推荐系统所用到的数据存储中间件。</span></p>
+<h2>3.效果保证</h2>
+<ul>
+<li>
+<h3>题目：Tutorial on Robustness of Recommender Systems</h3>
+</li>
+</ul>
+<h3>类型：演示文稿</h3>
+<h3>作者：Neil Hurley</h3>
+<h3>说明：</h3>
+<p><span class="reference">本文非常详细讨论了对推荐系统的攻击和防护，并有实验模拟。</span></p>
+<ul>
+<li>
+<h3>题目：Recommender Systems Handbook(第八章)</h3>
+</li>
+</ul>
+<h3>类型：书</h3>
+<h3>作者：Francesco Ricci等</h3>
+<h3>说明：</h3>
+<p><span class="reference">该书第八章介绍了能见到的几乎所有推荐系统评价指标，只是实际上用不到这么多指标。</span></p>
+<h2>其他书目</h2>
+<ol>
+<li>Pattern Recognization and Machine Learning（机器学习基础，有此一本足够了）。</li>
+<li>推荐系统实践（国内唯一一本非翻译的推荐系统书籍，入门必选）。</li>
+<li>信号与噪声（介绍贝叶斯统计的一本科普书）。</li>
+<li>复杂（推荐系统面对的是复杂网络，了解复杂系统和复杂网络的特点，有助于开脑洞）。</li>
+<li>信息简史（既然是信息经济，当然要读一本关于信息的历史）。</li>
+</ol>
+<p>知道你们不会读的，所以就不推荐太多了。但愿我这个激将法有助于你学习进步。</p>
+<h3>打包资料地址</h3>
+<p><a href="https://github.com/xingwudao/36">https://github.com/xingwudao/36</a></p>

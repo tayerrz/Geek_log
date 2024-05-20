@@ -1,0 +1,12 @@
+<p>你好，我是胡夕。</p><p>《Kafka核心技术与实战》已经结课一段时间了，你掌握得怎么样了呢？我给你准备了一个结课小测试，来帮助你检验自己的学习效果。</p><p>这套测试题有选择题和简答题两种形式。选择题共有 20 道题目，考题范围覆盖专栏的 42 讲正文，题目类型为单选题和多选题，满分 100 分，系统自动评分。简答题共有5道，建议你拿出纸笔，写下你的思考和答案，然后再和文末的答案进行对照。</p><p>还等什么，点击下面按钮开始测试吧！</p><p><a href="http://time.geekbang.org/quiz/intro?act_id=94&exam_id=190"><img src="https://static001.geekbang.org/resource/image/28/a4/28d1be62669b4f3cc01c36466bf811a4.png" alt=""></a></p><h2>简答题</h2><ol>
+<li>如果副本长时间不在ISR中，这说明什么？</li>
+<li>谈一谈Kafka Producer的acks参数的作用。</li>
+<li>Kafka中有哪些重要组件?</li>
+<li>简单描述一下消费者组（Consumer Group）。</li>
+<li>Kafka为什么不像Redis和MySQL那样支持读写分离？</li>
+</ol><h2>答案与解析</h2><p><span class="orange">1.如果副本长时间不在ISR中，这说明什么？</span></p><p><strong>答案与解析：</strong></p><p>如果副本长时间不在ISR中，这表示Follower副本无法及时跟上Leader副本的进度。通常情况下，你需要查看Follower副本所在的Broker与Leader副本的连接情况以及Follower副本所在Broker上的负载情况。</p><p><span class="orange">2.请你谈一谈Kafka Producer的acks参数的作用。</span></p><p><strong>答案与解析：</strong></p><!-- [[[read_end]]] --><p>目前，acks参数有三个取值：0、1和-1（也可以表示成all）。</p><p>0表示Producer不会等待Broker端对消息写入的应答。这个取值对应的Producer延迟最低，但是存在极大的丢数据的可能性。</p><p>1表示Producer等待Leader副本所在Broker对消息写入的应答。在这种情况下，只要Leader副本数据不丢失，消息就不会丢失，否则依然有丢失数据的可能。</p><p>-1表示Producer会等待ISR中所有副本所在Broker对消息写入的应答。这是最强的消息持久化保障。</p><p><span class="orange">3.Kafka中有哪些重要组件?</span></p><p><strong>答案与解析：</strong></p><ul>
+<li>Broker——Kafka服务器，负责各类RPC请求的处理以及消息的持久化。</li>
+<li>生产者——负责向Kafka集群生产消息。</li>
+<li>消费者——负责从Kafka集群消费消息。</li>
+<li>主题——保存消息的逻辑容器，生产者发送的每条消息都会被发送到某个主题上。</li>
+</ul><p><span class="orange">4.简单描述一下消费者组（Consumer Group）。</span></p><p><strong>答案与解析：</strong></p><p>消费者组是Kafka提供的可扩展且具有容错性的消费者机制。同一个组内包含若干个消费者或消费者实例（Consumer Instance），它们共享一个公共的ID，即Group ID。组内的所有消费者协调在一起来消费订阅主题的所有分区。每个分区只能由同一个消费组内的一个消费者实例来消费。</p><p><span class="orange">5.Kafka为什么不像Redis和MySQL那样支持读写分离？</span></p><p><strong>答案与解析：</strong></p><p>第一，这和它们的使用场景有关。对于那种读操作很多而写操作相对不频繁的负载类型而言，采用读写分离是非常不错的方案——我们可以添加很多Follower横向扩展，提升读操作性能。反观Kafka，它的主要场景还是在消息引擎，而不是以数据存储的方式对外提供读服务，通常涉及频繁地生产消息和消费消息，这不属于典型的读多写少场景。因此，读写分离方案在这个场景下并不太适合。</p><p>第二，Kafka副本机制使用的是异步消息拉取，因此存在Leader和Follower之间的不一致性。如果要采用读写分离，必然要处理副本滞后引入的一致性问题，比如如何实现Read-your-writes、如何保证单调读（Monotonic Reads）以及处理消息因果顺序颠倒的问题。相反，如果不采用读写分离，所有客户端读写请求都只在Leader上处理，也就没有这些问题了。当然，最后的全局消息顺序颠倒的问题在Kafka中依然存在，常见的解决办法是使用单分区，其他的方案还有Version Vector，但是目前Kafka没有提供。</p>

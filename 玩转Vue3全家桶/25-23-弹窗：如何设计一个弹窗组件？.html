@@ -1,0 +1,276 @@
+<p>你好，我是大圣。</p><p>上一讲我们剖析了表单组件的实现模式，相信学完之后，你已经掌握了表单类型组件设计的细节，表单组件的主要功能就是在页面上获取用户的输入。</p><p>不过，用户在交互完成之后，还需要知道交互的结果状态，这就需要我们提供专门用来反馈操作状态的组件。这类组件根据反馈的级别不同，也分成了很多种类型，比如全屏灰色遮罩、居中显示的对话框Dialog，在交互按钮侧面显示、用来做简单提示的tooltip，以及右上角显示信息的通知组件Notification等，这类组件的交互体验你都可以在<a href="https://e3.shengxinjing.cn/#">Element3官网</a>感受。</p><p>今天的代码也会用Element3的Dialog组件和Notification进行举例，在动手写代码实现之前，我们先从这个弹窗组件的需求开始说起。</p><h2>组件需求分析</h2><p>我们先来设计一下要做的组件，通过这部分内容，还可以帮你继续加深一下对单元测试Jest框架的使用熟练度。我建议你在设计一个新的组件的时候，也试试采用这种方式，先把组件所有的功能都罗列出来，分析清楚需求再具体实现，这样能够让你后面的工作事半功倍。</p><p>首先无论是对话框Dialog，还是消息弹窗Notification，它们都由一个弹窗的标题，以及具体的弹窗的内容组成的。我们希望弹窗有一个关闭的按钮，点击之后就可以关闭弹窗，弹窗关闭之后还可以设置回调函数。</p><!-- [[[read_end]]] --><p>下面这段代码演示了dialog组件的使用方法，通过title显示标题，通过slot显示文本内容和交互按钮，而通过v-model就能控制显示状态。</p><pre><code class="language-typescript">&lt;el-dialog
+  title="提示"
+  :visible.sync="dialogVisible"
+  width="30%"
+  v-model:visible="dialogVisible"
+&gt;
+  &lt;span&gt;这是一段信息&lt;/span&gt;
+  &lt;template #footer&gt;
+    &lt;span class="dialog-footer"&gt;
+      &lt;el-button @click="dialogVisible = false"&gt;取 消&lt;/el-button&gt;
+      &lt;el-button type="primary" @click="dialogVisible = false"&gt;确 定&lt;/el-button&gt;
+    &lt;/span&gt;
+  &lt;/template&gt;
+&lt;/el-dialog&gt;
+</code></pre><p>这类组件实现起来和表单类组件区别不是特别大，我们首先需要做的就是<strong>控制好组件的数据传递</strong>，并且使用Teleport渲染到页面顶层的body标签。</p><p>像Dialog和Notification类的组件，我们只是单纯想显示一个提示或者报错信息，过几秒就删除，如果在每个组件内部都需要写一个&lt;Dialog v-if&gt;，并且使用v-if绑定变量的方式控制显示就会显得很冗余。</p><p>所以，这里就要用到一种调用Vue组件的新方式：我们可以使用JavaScript的API动态地创建和渲染Vue的组件。具体如何实现呢？我们以Notification组件为例一起看一下。</p><p>下面的代码是Element3的Notification演示代码。组件内部只有两个button，我们不需要书写额外的组件标签，只需要在&lt;script setup&gt;中使用Notification.success函数，就会在页面动态创建Notification组件，并且显示在页面右上角。</p><pre><code class="language-xml">&lt;template&gt;
+  &lt;el-button plain @click="open1"&gt; 成功 &lt;/el-button&gt;
+  &lt;el-button plain @click="open2"&gt; 警告 &lt;/el-button&gt;
+&lt;/template&gt;
+&lt;script setup&gt;
+  import { Notification } from 'element3'
+
+  function open1() {
+    Notification.success({
+      title: '成功',
+      message: '这是一条成功的提示消息',
+      type: 'success'
+    })
+  }
+  function open2() {
+    Notification.warning({
+      title: '警告',
+      message: '这是一条警告的提示消息',
+      type: 'warning'
+    })
+  }
+
+
+&lt;/script&gt;
+</code></pre><h2>弹窗组件实现</h2><p>分析完需求之后，我们借助单元测试的方法来实现这个弹窗组件（单元测试的内容如果记不清了，你可以回顾<a href="https://time.geekbang.org/column/article/464098">第20讲</a>）。</p><p>我们依次来分析Notification的代码，相比于写Demo逻辑的代码，这次我们体验一下实际的组件和演示组件的区别。我们来到element3下面的src/components/Notification/notifucation.vue代码中，下面的代码构成了组件的主体框架，我们不去直接写组件的逻辑，而是先从测试代码来梳理组件的功能。</p><pre><code class="language-xml">&lt;template&gt;
+  &lt;div class="el-nofication"&gt;
+    &lt;slot /&gt;
+  &lt;/div&gt;
+&lt;/template&gt;
+
+&lt;script&gt;
+
+&lt;/script&gt;
+
+&lt;style lang="scss"&gt;
+@import '../styles/mixin';
+
+&lt;/style&gt;
+</code></pre><p>结合下面的代码可以看到，我们进入到了内部文件Notification.spec.js中。下面的测试代码中，我们期待Notification组件能够渲染el-notification样式类，并且内部能够通过属性title渲染标题；message属性用来渲染消息主体；position用来渲染组件的位置，让我们的弹窗组件可以显示在浏览器四个角。</p><pre><code class="language-xml">import Notification from "./Notification.vue"
+import { mount } from "@vue/test-utils"
+
+describe("Notification", () =&gt; { 
+  
+  it('渲染标题title', () =&gt; {
+    const title = 'this is a title'
+    const wrapper = mount(Notification, {
+      props: {
+        title
+      }
+    })
+    expect(wrapper.get('.el-notification__title').text()).toContain(title)
+  })
+
+  it('信息message渲染', () =&gt; {
+    const message = 'this is a message'
+    const wrapper = mount(Notification, {
+      props: {
+        message
+      }
+    })
+    expect(wrapper.get('.el-notification__content').text()).toContain(message)
+  })
+
+  it('位置渲染', () =&gt; {
+    const position = 'bottom-right'
+    const wrapper = mount(Notification, {
+      props: {
+        position
+      }
+    })
+    expect(wrapper.find('.el-notification').classes()).toContain('right')
+    expect(wrapper.vm.verticalProperty).toBe('bottom')
+    expect(wrapper.find('.el-notification').element.style.bottom).toBe('0px')
+  })
+
+  it('位置偏移', () =&gt; {
+    const verticalOffset = 50
+    const wrapper = mount(Notification, {
+      props: {
+        verticalOffset
+      }
+    })
+    expect(wrapper.vm.verticalProperty).toBe('top')
+    expect(wrapper.find('.el-notification').element.style.top).toBe(
+      `${verticalOffset}px`
+    )
+  })
+
+})
+
+</code></pre><p>这时候毫无疑问，测试窗口会报错。我们需要进入notificatin.vue中实现代码逻辑。<br>
+下面的代码中，我们在代码中接收title、message和position，使用notification__title和notification__message渲染标题和消息。</p><pre><code class="language-xml">&lt;template&gt;
+  &lt;div class="el-notification" :style="positionStyle" @click="onClickHandler"&gt;
+    &lt;div class="el-notification__title"&gt;
+      {{ title }}
+    &lt;/div&gt;
+
+    &lt;div class="el-notification__message"&gt;
+      {{ message }}
+    &lt;/div&gt;
+
+    &lt;button
+      v-if="showClose"
+      class="el-notification__close-button"
+      @click="onCloseHandler"
+    &gt;&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/template&gt;
+&lt;script setup&gt;
+const instance = getCurrentInstance()
+const visible = ref(true)
+const verticalOffsetVal = ref(props.verticalOffset)
+
+const typeClass = computed(() =&gt; {
+  return props.type ? `el-icon-${props.type}` : ''
+})
+
+const horizontalClass = computed(() =&gt; {
+  return props.position.endsWith('right') ? 'right' : 'left'
+})
+
+const verticalProperty = computed(() =&gt; {
+  return props.position.startsWith('top') ? 'top' : 'bottom'
+})
+
+const positionStyle = computed(() =&gt; {
+  return {
+    [verticalProperty.value]: `${verticalOffsetVal.value}px`
+  }
+})
+&lt;/script&gt;
+
+&lt;style lang="scss"&gt;
+.el-notification {
+  position: fixed;
+  right: 10px;
+  top: 50px;
+  width: 330px;
+  padding: 14px 26px 14px 13px;
+  border-radius: 8px;
+  border: 1px solid #ebeef5;
+  background-color: #fff;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+&lt;/style&gt;
+</code></pre><p>然后我们新增测试代码，设置弹窗是否显示关闭按钮以及关闭弹窗之后的回调函数。我们希望点击关闭按钮之后，就能够正确执行传入的onClose函数。</p><pre><code class="language-javascript">it('set the showClose ', () =&gt; {
+    const showClose = true
+    const wrapper = mount(Notification, {
+      props: {
+        showClose
+      }
+    })
+    expect(wrapper.find('.el-notification__closeBtn').exists()).toBe(true)
+    expect(wrapper.find('.el-icon-close').exists()).toBe(true)
+  })
+
+  it('点击关闭按钮', async () =&gt; {
+    const showClose = true
+    const wrapper = mount(Notification, {
+      props: {
+        showClose
+      }
+    })
+    const closeBtn = wrapper.get('.el-notification__closeBtn')
+    await closeBtn.trigger('click')
+    expect(wrapper.get('.el-notification').isVisible()).toBe(false)
+  })
+
+  it('持续时间之后自动管理', async () =&gt; {
+    jest.useFakeTimers()
+
+    const wrapper = mount(Notification, {
+      props: {
+        duration: 1000
+      }
+    })
+    jest.runTimersToTime(1000)
+    await flushPromises()
+    expect(wrapper.get('.el-notification').isVisible()).toBe(false)
+     })
+</code></pre><p>到这里，Notification组件测试的主体逻辑就实现完毕了，我们拥有了一个能够显示在右上角的组件，具体效果你可以参考后面这张截图。</p><p><img src="https://static001.geekbang.org/resource/image/aa/04/aa1506d30d0b4d641aa7175c2a4a5004.jpg?wh=1920x972" alt="图片"></p><p>进行到这里，距离完成整体设计我们还差两个步骤。</p><p>首先，弹窗类的组件都需要直接渲染在body标签下面，弹窗类组件由于布局都是绝对定位，如果在组件内部渲染，组件的css属性（比如Transform）会影响弹窗组件的渲染样式，为了避免这种问题重复出现，弹窗组件Dialog、Notification都需要渲染在body内部。</p><p>Dialog组件可以直接使用Vue3自带的Teleport，很方便地渲染到body之上。在下面的代码中, 我们用teleport组件把dialog组件包裹之后，通过to属性把dialog渲染到body标签内部。</p><pre><code class="language-javascript">  &lt;teleport
+    :disabled="!appendToBody"
+    to="body"
+  &gt;
+    &lt;div class="el-dialog"&gt;
+      &lt;div class="el-dialog__content"&gt;
+        &lt;slot /&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/teleport&gt;
+</code></pre><p>这时我们使用浏览器调试窗口，就可以看到Dialog标签已经从当前组件移动到了body标签内部，如下图所示。</p><p><img src="https://static001.geekbang.org/resource/image/d9/61/d9199199590871f811309f4c78963761.jpg?wh=1920x902" alt="图片"></p><p>但是Notification组件并不会在当前组件以组件的形式直接调用，我们需要像Element3一样，能够使用js函数动态创建Notification组件，<strong>给Vue的组件提供Javascript的动态渲染方法，这是弹窗类组件的特殊需求</strong>。</p><h2>组件渲染优化</h2><p>我们先把测试代码写好，具体如下。代码中分别测试函数创建组件，以及不同配置和样式的通知组件。</p><pre><code class="language-xml">it('函数会创建组件', () =&gt; {
+  const instanceProxy = Notification('foo')
+  expect(instanceProxy.close).toBeTruthy()
+})
+
+it('默认配置 ', () =&gt; {
+  const instanceProxy = Notification('foo')
+
+  expect(instanceProxy.$props.position).toBe('top-right')
+  expect(instanceProxy.$props.message).toBe('foo')
+  expect(instanceProxy.$props.duration).toBe(4500)
+  expect(instanceProxy.$props.verticalOffset).toBe(16)
+})
+test('字符串信息', () =&gt; {
+  const instanceProxy = Notification.info('foo')
+
+  expect(instanceProxy.$props.type).toBe('info')
+  expect(instanceProxy.$props.message).toBe('foo')
+})
+test('成功信息', () =&gt; {
+  const instanceProxy = Notification.success('foo')
+
+  expect(instanceProxy.$props.type).toBe('success')
+  expect(instanceProxy.$props.message).toBe('foo')
+})
+</code></pre><p>现在测试写完后还是会报错，因为现在Notification函数还没有定义，我们要能通过Notification函数动态地创建Vue的组件，而不是在template中使用组件。</p><p>在<a href="https://time.geekbang.org/column/article/444283">JSX那一讲</a>中我们讲过，template的本质就是使用h函数创建虚拟Dom，如果我们自己想动态创建组件时，使用相同的方式即可。</p><p>在下面的代码中我们使用Notification函数去执行createComponent函数，使用h函数动态创建组件，实现了动态组件的创建。</p><pre><code class="language-javascript">function createComponent(Component, props, children) {
+  const vnode = h(Component, { ...props, ref: MOUNT_COMPONENT_REF }, children)
+  const container = document.createElement('div')
+  vnode[COMPONENT_CONTAINER_SYMBOL] = container
+  render(vnode, container)
+  return vnode.component
+}
+export function Notification(options) {
+  return createNotification(mergeProps(options))
+}
+
+function createNotification(options) {
+  const instance = createNotificationByOpts(options)
+  setZIndex(instance)
+  addToBody(instance)
+  return instance.proxy
+}
+</code></pre><p>创建组件后，由于Notification组件同时可能会出现多个弹窗，所以我们需要使用数组来管理通知组件的每一个实例，每一个弹窗的实例都存储在数组中进行管理。</p><p>下面的代码里，我演示了怎样用数组管理弹窗的实例。Notification函数最终会暴露给用户使用，在Notification函数内部我们通过createComponent函数创建渲染的容器，然后通过createNotification创建弹窗组件的实例，并且维护在instanceList中。</p><pre><code class="language-javascript">const instanceList = []
+function createNotification(options) {
+  ...
+  addInstance(instance)
+  return instance.proxy
+}  
+function addInstance(instance) {
+  instanceList.push(instance)
+}
+;['success', 'warning', 'info', 'error'].forEach((type) =&gt; {
+  Notification[type] = (options) =&gt; {
+    if (typeof options === 'string' || isVNode(options)) {
+      options = {
+        message: options
+      }
+    }
+    options.type = type
+    return Notification(options)
+  }
+})
+
+// 有了instanceList， 可以很方便的关闭所有信息弹窗
+Notification.closeAll = () =&gt; {
+  instanceList.forEach((instance) =&gt; {
+    instance.proxy.close()
+    removeInstance(instance)
+  })
+}
+</code></pre><p>最后，我带你简单回顾下我们都做了什么。在正式动手实现弹窗组件前，我们分析了弹窗类组件的风格。弹窗类组件主要负责用户交互的反馈。根据显示的级别不同，它可以划分成不同的种类：既有覆盖全屏的弹窗Dialog，也有负责提示消息的Notification。</p><p>这些组件除了负责渲染传递的数据和方法之外，还需要能够脱离当前组件进行渲染，<strong>防止当前组件的css样式影响布局</strong>。因此Notification组件需要渲染到body标签内部，而Vue提供了Teleport组件来完成这个任务，我们通过Teleport组件就能把内部的组件渲染到指定的dom标签。</p><p>之后，我们需要给组件提供JavaScript调用的方法。我们可以使用Notification()的方式动态创建组件，利用createNotification即可动态创建Vue组件的实例。</p><p>对于弹窗组件来说可以这样操作：首先通过createNotification函数创建弹窗的实例，并且给每个弹窗设置好唯一的id属性，然后存储在数组中进行管理。接着，我们通过对createNotification函数返回值的管理，即可实现弹窗动态的渲染、更新和删除功能。</p><h2>总结</h2><p>正文里已经详细讲解和演示了弹窗组件的设计，所以今天的总结我想变个花样，再给你说说TDD的事儿。</p><p>很多同学会觉得写测试代码要花一定成本，有畏难心理，觉得自己不太会写测试，这些“假想”给我们造成了“TDD很难实施”的错觉。实际上入门TDD并没有这么难。按照我的实践经验来看，先学会怎么写测试，再学习怎么重构，基本上就可以入门写TDD了。</p><p>就拿我们这讲的实践来说，我们再次应用了<strong>测试驱动开发</strong>这个方式来实现弹窗组件，把整体需求拆分成一个个子任务，逐个击破。根据设计的需求写好测试代码之后，测试代码就会检查我们的业务逻辑有没有实现，指导我们做相应的修改。</p><p>咱们的实践过程抽象出来，一共包括四个步骤：写测试 -&gt; 运行测试(报错) -&gt; 写代码让测试通过 -&gt; 重构的方式。这样的开发模式，今后你在设计组件库时也可以借鉴，不但有助于提高代码的质量和可维护性，还能让代码有比较高的代码测试覆盖率。</p><h2>思考题</h2><p>最后留一个思考题，现在我们设计的Notification组件的message只能支持文本消息，如果想支持传入其他组件，应该如何实现？</p><p>欢迎你在评论去分享你的答案，也欢迎你把这一讲的内容分享给你的同事和朋友们，我们下一讲再见。</p>

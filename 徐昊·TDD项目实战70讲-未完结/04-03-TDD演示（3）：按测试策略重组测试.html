@@ -1,0 +1,87 @@
+<p>你好，我是徐昊。今天我们来继续进行命令行参数解析的TDD演示。</p><p>首先让我们回顾一下题目与需求与代码进度。如前所述，题目源自Bob大叔的  <em><em>Clean Code</em></em>  第十四章：</p><blockquote>
+<p>我们中的大多数人都不得不时不时地解析一下命令行参数。如果我们没有一个方便的工具，那么我们就简单地处理一下传入main函数的字符串数组。有很多开源工具可以完成这个任务，但它们可能并不能完全满足我们的要求。所以我们再写一个吧。<br>
+<strong>　</strong><br>
+传递给程序的参数由标志和值组成。标志应该是一个字符，前面有一个减号。每个标志都应该有零个或多个与之相关的值。例如：<br>
+<strong>　</strong><br>
+-l -p 8080 -d /usr/logs<br>
+<strong>　</strong><br>
+“l”（日志）没有相关的值，它是一个布尔标志，如果存在则为true，不存在则为false。“p”（端口）有一个整数值，“d”（目录）有一个字符串值。标志后面如果存在多个值，则该标志表示一个列表：<br>
+<strong>　</strong><br>
+-g this is a list -d 1 2 -3 5<br>
+<strong>　</strong><br>
+"g"表示一个字符串列表[“this”, “is”, “a”, “list”]，“d"标志表示一个整数列表[1, 2, -3, 5]。<br>
+<strong>　</strong><br>
+如果参数中没有指定某个标志，那么解析器应该指定一个默认值。例如，false代表布尔值，0代表数字，”"代表字符串，[]代表列表。如果给出的参数与模式不匹配，重要的是给出一个好的错误信息，准确地解释什么是错误的。<br>
+<strong>　</strong><br>
+确保你的代码是可扩展的，即如何增加新的数值类型是直接和明显的。</p>
+</blockquote><!-- [[[read_end]]] --><p>目前我们的代码结构如下图所示：</p><p><img src="https://static001.geekbang.org/resource/image/e6/c4/e6efe45de49576d10b0f8b9505c6b8c4.jpg?wh=7064x3323" alt=""></p><p>我们目前的任务列表为：</p><pre><code>ArgsTest:
+// sad path:
+// TODO: -bool -l t / -l t f
+// TODO: - int -p/ -p 8080 8081
+// TODO: - string -d/ -d /usr/logs /usr/vars
+// default value:
+// TODO: - bool : false
+// TODO: -int :0
+// TODO: - string &quot;&quot;
+</code></pre><h2>调整任务列表</h2><p>当我们罗列任务列表的时候，还没有进行重构，系统中也只有Args一个类。而经过重构之后，我们提取了OptionParser接口，以及与之对应的实现类：BooleanOptionParser和SingleValuedOptionParser。那么当再去构造测试的时候，就存在两个不同的选择：继续针对Args进行测试，或是直接对BooleanOptionParser进行测试。</p><p>代码分别如下所示：</p><pre><code>@Test
+public void should_not_accept_extra_argument_for_boolean_option() {
+  TooManyArgumentsException e = assertThrows(TooManyArgumentsException.class, 
+    () -&gt; Args.parse(BooleanOption.class, &quot;-l&quot;, &quot;t&quot;));
+  assertEquals(&quot;l&quot;, e.getOption()); 
+}
+
+@Test
+public void should_not_accept_extra_argument_for_boolean_option() {
+    TooManyArgumentsException e = assertThrows(TooManyArgumentsException.class, () -&gt;
+            new BooleanOptionParser().parse(&quot;-l&quot;, &quot;t&quot;, option(&quot;l&quot;)));
+    assertEquals(&quot;l&quot;, e.getOption());
+}
+</code></pre><p>在当前的架构下，这两个测试是等效的功能验证，但是它们的测试范围不同，在下图中，我用虚线边框圈定了它们的范围：</p><p><img src="https://static001.geekbang.org/resource/image/61/a5/614c3b883bdd3c45f59285992ec502a5.jpg?wh=7487x4213" alt=""></p><p>那么在这种情况下，我们可以选择粒度更小的测试，这样更有益于问题的定位。于是，我们可以修改任务列表，将剩余的任务分配到对应的组件上去：</p><pre><code>BooleanOptionParserTest: 
+// sad path:
+// TODO: -bool -l t / -l t f
+// default:
+// TODO: - bool : false
+
+SingleValuedOptionParserTest:
+// sad path:
+// TODO: - int -p/ -p 8080 8081
+// TODO: - string -d/ -d /usr/logs /usr/vars
+// default value:
+// TODO: -int :0
+// TODO: - string &quot;&quot;
+</code></pre><p>现在让我们进入红/绿循环：</p><p><video poster="https://static001.geekbang.org/resource/image/6c/2a/6c00yy3399ed8de0c99f39ac0fb3d32a.jpg" preload="none" controls=""><source src="https://media001.geekbang.org/customerTrans/7e27d07d27d407ebcc195a0e78395f55/a9bfca5-17f91706b9e-0000-0000-01d-dbacd.mp4" type="video/mp4"><source src=" https://media001.geekbang.org/b147373e80d0440d9886f736551ef767/166a063799784ba1b21b129bd5ec4b26-480f0c0504821677b9788fc920148b46-sd.m3u8" type="application/x-mpegURL"></video></p><p>类似的，根据任务列表，完成SingleValuedOptionParser的功能：</p><p><video poster="https://static001.geekbang.org/resource/image/6c/2a/6c00yy3399ed8de0c99f39ac0fb3d32a.jpg" preload="none" controls=""><source src="https://media001.geekbang.org/customerTrans/7e27d07d27d407ebcc195a0e78395f55/435dd8e6-17f919289eb-0000-0000-01d-dbacd.mp4" type="video/mp4"><source src=" https://media001.geekbang.org/d87601e59bbe4c53a68088078bea1297/86c89a93d6304fd38649e5b9f498bfe2-b1aeef6e30c6c484351048aa1e190859-sd.m3u8" type="application/x-mpegURL"></video></p><h2>按照测试策略重组测试</h2><p>在这个红/绿环节中，我们发现在整数类型和字符串类型的异常场景中，差异仅仅在于如何构造SingleValuedOptionParser：</p><pre><code>new SingleValuedOptionParser(0, Integer:parseInt)
+new SingleValuedOptionParser(&quot;&quot;, String::valueOf)
+</code></pre><p>也就是说，仅仅是测试代码的差别，而被测试的代码则没有任何区别。我们按照任务列表，再构造其他场景的测试，也仅仅是不同测试数据的重复而已。所以将剩余任务从列表中取消就好了。</p><p>在当前的代码中，还遗存着一些重构前的测试。对比经过重构之后新写的测试，就会发现对于类似的功能，我们测试的出发点和测试的范围都有不同，这是一种坏味道。我们需要对测试进行重构，以消除这些不一致：</p><p><video poster="https://static001.geekbang.org/resource/image/6c/2a/6c00yy3399ed8de0c99f39ac0fb3d32a.jpg" preload="none" controls=""><source src="https://media001.geekbang.org/customerTrans/7e27d07d27d407ebcc195a0e78395f55/5143a612-17f91839fd6-0000-0000-01d-dbacd.mp4" type="video/mp4"><source src=" https://media001.geekbang.org/36df79120e4f45de96c86718edab529d/8fbe4a535d574322902224cccaf9c03d-a7bd7b933fd068bf5812733a3b4d5a2c-sd.m3u8" type="application/x-mpegURL"></video></p><p>在继续完成其他功能之前，我们可以快速审查一下代码，可以显而易见地发现几个明显的Bug，那么我们可以通过一系列红/绿环节来修复它们：</p><p><video poster="https://static001.geekbang.org/resource/image/6c/2a/6c00yy3399ed8de0c99f39ac0fb3d32a.jpg" preload="none" controls=""><source src="https://media001.geekbang.org/customerTrans/7e27d07d27d407ebcc195a0e78395f55/25515456-17f9176eb96-0000-0000-01d-dbacd.mp4" type="video/mp4"><source src=" https://media001.geekbang.org/ad1f90ca1b6a4595a12b436a0e51c623/6d6cb2e787f84ac68bd3e1bd88e0018f-bd76453965100ffa32afc3cac1d32063-sd.m3u8" type="application/x-mpegURL"></video></p><p>好了，到此为止，我们得到了一个颇为健壮的代码，以及清晰、可扩展的代码结构。</p><h2>小结</h2><p>在这节课中，我们展示了红/绿/重构循环是如何与任务列表互动，任务列表又是怎样持续指导我们进行测试驱动开发的。让我们回想一下最开始构想的任务列表：</p><pre><code>// TODO: boolean -l
+// TODO: int -p 8080
+// TODO: string -d /usr/logs
+// TODO: example 1
+// sad path:
+// TODO: -bool -l t / -l t f
+// TODO: - int -p/ -p 8080 8081
+// TODO: - string -d/ -d /usr/logs /usr/vars
+// default value:
+// TODO: - bool : false
+// TODO: -int :0
+// TODO: - string &quot;&quot;
+</code></pre><p>我们真正的开发过程是这样的，先按照任务列表完成了一块功能点：</p><pre><code>// TODO: boolean -l 
+// TODO: int -p 8080
+// TODO: string -d /usr/logs
+// TODO: example 1
+</code></pre><p>发现了坏味道，开始重构。通过重构引入了新的组件，改变了架构。于是剩余的任务列表改为：</p><pre><code>BooleanOptionParserTest: 
+// sad path:
+// TODO: -bool -l t / -l t f
+// default:
+// TODO: - bool : fals
+
+SingleValuedOptionParserTest:
+// sad path:
+// TODO: - int -p/ -p 8080 8081
+// default value:
+// TODO: -int :0
+</code></pre><p>陆续完成这些任务，发现不一致的测试策略，重组测试。然后进行代码审查，发现了几个缺陷，于是剩余任务列表变为（请重点关注列表的变化）：</p><pre><code>ArgsTest:
+// TODO：无标注的参数
+// TODO：不支持的类型
+   
+SingleValuedOptionParserTest:
+// TODO: 错误的数值格式
+</code></pre><p>不难发现，任务列表是一个随代码结构（重构）、测试策略（在哪个范围内测试）、代码实现情况（存在哪些缺陷）等因素而动态调整的列表。<strong>它的内容体现了我们最新的认知，它的变化记录了我们认知改变的过程。</strong></p><p>下节课，我们将继续完成命令行列表标志的功能。我们会重复任务分解与红/绿/重构循环。请注意，对于列表标志的任务分解与我们已完成的功能有何不同。</p><h2>思考题</h2><p>请根据当前代码结构，对列表标志功能进行任务分解。</p><p>如果你在学习过程中还有什么问题或想法，欢迎加入<a href="https://jinshuju.net/f/zvOavT">读者交流群</a>。最后，也欢迎把你学习这节课的代码与体会分享在留言区，我们下节课再见！</p>

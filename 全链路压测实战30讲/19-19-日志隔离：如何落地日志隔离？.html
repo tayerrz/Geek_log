@@ -1,0 +1,194 @@
+<p>你好，我是高楼。</p><p>这节课，我们详细来讲讲如何基于微服务技术落地日志隔离。</p><p>在全链路压测的隔离中，有一个很重要的部分就是日志隔离，即区分对应的日志。之所以要将正常日志和压测日志都进行隔离，是为了不影响正常日志存储和方便线上问题排查。</p><p>在当前的技术市场上，主流的日志框架是Log4j、Log4j2（Log4j的升级版）和Logback。</p><p>Logback 是Log4j的改良版，拥有更多的特性，性能也更好，天然支持 SLF4J（ Simple Logging Facade for Java，日志输出门面，非日志框架）。Slf4j可以支持不同的日志框架，实现对日志框架的一层抽象，可以整理不同的日志框架的输出。我们这个电商项目也是使用的 Logback 的方式。</p><p>在具体的方案选择上，我们选择改写 Logback 的 Appender，然后根据压测标记将日志写入对应目录中。</p><p>既然已经选定了Logback日志框架做日志隔离改造，那么我们就可以直接上手进行技术预演了。</p><h2>技术预演</h2><p>首先我们还是先在本地开发环境做一下日志隔离的技术预演。预演通过之后，再把相关代码移植到demo系统中去验证。</p><p>在第 14-18 讲，我们已经通过 Sleuth 把压测标记透传到了每个服务中，下面只需要从对应服务的数据上下文获取标记，然后完成逻辑判断就能实现日志的分离了。</p><!-- [[[read_end]]] --><p>考虑到日志打印一般是无序的，在一个用户的使用过程中，可能有多个不同的线程来进行处理。典型的例子是当用户访问某个页面时，应用服务可能会创建一个新的线程来处理该请求，也可能从线程池中复用已有的线程。在一个用户 session 存续期间，可能有多个线程处理过该用户的请求。当需要追踪某个用户在系统中的相关日志记录时，就会变得很麻烦。</p><p>解决办法就是引入 MDC（Mapped Diagnostic Context，映射调试上下文）。而 <a href="http://www.slf4j.org/">SLF4J </a>提供了<a href="http://www.slf4j.org/api/org/slf4j/MDC.html"> MDC</a> ( Mapped Diagnostic Contexts )功能，它的实现也是利用了 ThreadLocal 机制。改造代码只需要将指定的值 put 到线程上下文的 Map 中，然后在对应的地方使用 get 方法获取对应的值，从而达到自定义和修改日志输出格式内容的目的。</p><p>考虑到压测流量比较大，产生的日志也非常多，压测流量的日志很容易覆盖正常流量的日志。我们选择改写 Logback&nbsp;的 Appender，根据流量标记将日志写入对应的影子目录中，并且配置默认的删除策略，日志只保存三天。</p><p>整体方案设计可以参考下面这张图：</p><p><img src="https://static001.geekbang.org/resource/image/ca/32/ca406e7313aeb885b55acfcbbb2db632.jpg?wh=1764x1920" alt="图片"></p><p>下面我们来看一下详细的操作步骤。</p><h3>通过 MDC 实现日志分离</h3><p>​<strong>第一步，创建测试接口。</strong></p><p>在 Controller 中添加下面的代码，请求资源路径为 <a href="http://localhost:8080/mdc/1">/mdc/1</a>  。其中，我们通过 {id} 来判断要不要把 MDC 信息写入日志中。</p><pre><code class="language-java">    @GetMapping("/mdc/{id}")
+    @ResponseBody
+    public Object MdcGet(@PathVariable Integer id) {
+        HashMap&lt;String, Object&gt; response = new HashMap&lt;&gt;();
+        response.put("mdc", "调试");
+        response.put("time", new Date());
+         if (id == 1) {
+            MDC.put("dunshan", "flag");
+            log.info("日志写入 " + id);
+            MDC.remove("dunshan");
+        } else {
+            log.info("不是 mdc 日志 " + id);
+        }
+        return response;
+    }
+</code></pre><p>​<strong>第二步，修改配置文件。</strong></p><p>代码写好后，需要在 logback-spring.xml 中添加下面的配置：</p><pre><code class="language-xml"> &lt;pattern&gt;[dunshan :%X{dunshan}]  %d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger - %msg%n&lt;/pattern&gt;
+</code></pre><p>这个配置主要目的是格式化日志。</p><p>​<strong>第三步，接口测试验证。</strong></p><p>在浏览器中发送一次请求，后台日志就会根据规则输出对应内容。</p><p><img src="https://static001.geekbang.org/resource/image/a3/92/a38f125cdbca92516ec327340b3a8892.png?wh=770x268" alt="图片"></p><p>再来看一下服务端日志的显示情况，我们看到 MDC 信息已经成功加入到控制台日志了。</p><p><img src="https://static001.geekbang.org/resource/image/b1/57/b13b120fd154eeb08a5yyf3e638ae757.png?wh=1920x410" alt="图片"></p><h3></h3><p>​<strong>第四步，创建 GenericFilterBean 全局过滤类。</strong></p><p>我们通过实现全局 Filter 类 GenericFilterBean 获取标记并加入 MDC 上下文中，这样，后续我们就可以根据 MDC 将压测流量和正常流量的日志分别保存到不同文件目录中去了。</p><p>参考代码如下：</p><pre><code class="language-java">@Component
+public class MyFilter extends GenericFilterBean {
+
+    @Override
+    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
+        HttpServletRequest request = (HttpServletRequest) servletRequest;
+        String flag = request.getHeader("flag");
+        if (StringUtils.isNotBlank(flag)) {
+            MDC.put("dunshan", "shadow");
+            logger.info("flag：" + flag);
+        } else {
+            MDC.put("dunshan", "produce");
+        }
+        filterChain.doFilter(servletRequest, servletResponse);
+    }
+
+    @Override
+    public void destroy() {
+        MDC.clear();
+    }
+}
+</code></pre><p><strong>​第五步，创建 Logback 配置文件。</strong></p><p>标记增加成功后，再在 logback-spring-xml 中添加 Log 输出格式、路径、级别、输出位置以及MDC的配置等信息：</p><pre><code class="language-xml">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;configuration&gt;
+    &lt;!-- https://github.com/spring-projects/spring-boot/blob/v1.5.13.RELEASE/spring-boot/src/main/resources/org/springframework/boot/logging/logback/defaults.xml --&gt;
+    &lt;include resource="org/springframework/boot/logging/logback/defaults.xml" /&gt;
+
+    &lt;!--格式化输出：%d表示日期，%thread表示线程名，%-5level：级别从左显示5个字符宽度%msg：日志消息，%n是换行符--&gt;
+    &lt;property name="FILE_LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} ${LOG_LEVEL_PATTERN:-%5p} [%t] [dunshan:%X{dunshan}] %-40.40logger{39} : %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/&gt;
+    &lt;property name="CONSOLE_LOG_PATTERN"
+              value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/&gt;/&gt;
+
+    &lt;property name="APP_NAME" value="dunshan-log" /&gt;
+    &lt;!--    文件保存路径注意--&gt;
+    &lt;property name="LOG_PATH" value="logs/${APP_NAME}/" /&gt;
+    &lt;property name="LOG_FILE" value="${LOG_PATH}/application.log" /&gt;
+    
+    &lt;appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender"&gt;
+        &lt;encoder&gt;
+            &lt;pattern&gt;${CONSOLE_LOG_PATTERN}&lt;/pattern&gt;
+            &lt;charset&gt;utf8&lt;/charset&gt;
+        &lt;/encoder&gt;
+    &lt;/appender&gt;
+    
+    &lt;appender name="MDC"
+              class="ch.qos.logback.classic.sift.SiftingAppender"&gt;
+        &lt;discriminator&gt;
+            &lt;key&gt;dunshan&lt;/key&gt;
+            &lt;defaultValue&gt;produce&lt;/defaultValue&gt;
+        &lt;/discriminator&gt;
+        &lt;sift&gt;
+            &lt;appender name="FILE-${logFileName}" class="ch.qos.logback.core.rolling.RollingFileAppender"&gt;
+                &lt;rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy"&gt;
+                    &lt;!-- 按天回滚 daily --&gt;
+                    &lt;fileNamePattern&gt;${LOG_PATH}/${dunshan}/log-info-${dunshan}-%d{yyyy-MM-dd}-%i.log&lt;/fileNamePattern&gt;
+                    &lt;!-- 日志最大的历史 30天 --&gt;
+                    &lt;maxHistory&gt;7&lt;/maxHistory&gt;
+                    &lt;timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP"&gt;
+                        &lt;!-- maxFileSize:这是活动文件的大小，默认值是10MB，这里设置为500MB --&gt;
+                        &lt;maxFileSize&gt;50MB&lt;/maxFileSize&gt;
+                        &lt;totalSizeCap&gt;20GB&lt;/totalSizeCap&gt;
+                    &lt;/timeBasedFileNamingAndTriggeringPolicy&gt;
+                &lt;/rollingPolicy&gt;
+                &lt;encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder"&gt;
+                    &lt;pattern&gt;${FILE_LOG_PATTERN}&lt;/pattern&gt;
+                &lt;/encoder&gt;
+                &lt;filter class="ch.qos.logback.classic.filter.LevelFilter"&gt;
+                    &lt;!-- 只打印info日志 --&gt;
+                    &lt;level&gt;INFO&lt;/level&gt;
+                    &lt;onMatch&gt;ACCEPT&lt;/onMatch&gt;
+                    &lt;onMismatch&gt;DENY&lt;/onMismatch&gt;
+                &lt;/filter&gt;
+            &lt;/appender&gt;
+        &lt;/sift&gt;
+    &lt;/appender&gt;
+
+
+
+    &lt;root level="INFO"&gt;
+        &lt;appender-ref ref="CONSOLE" /&gt;
+        &lt;appender-ref ref="MDC" /&gt;
+    &lt;/root&gt;
+&lt;/configuration&gt;
+</code></pre><p><strong>​第六步，接口测试验证。</strong></p><p>代码添加成功之后，我们还是使用 JMeter 模拟正常流量和压测流量的请求验证一下。</p><p>首先，我们使用 JMeter 创建两个请求。</p><ul>
+<li>
+<p>正常流量（不带 Header 标记）<br>
+<img src="https://static001.geekbang.org/resource/image/a6/b4/a615dd6af2a6dda1db5ffc19b3a486b4.png?wh=1920x609" alt="图片"></p>
+</li>
+<li>
+<p>压测流量（带Header 标记）<br>
+<img src="https://static001.geekbang.org/resource/image/3a/f7/3aa7607580f03b7a295a5ca7186509f7.png?wh=1920x372" alt="图片"></p>
+</li>
+</ul><p>场景设置并发100次，循环100次，执行后，查看控制台。</p><p><img src="https://static001.geekbang.org/resource/image/4c/2d/4ce7e61190ea54a8d2e6ca3580001f2d.png?wh=1882x572" alt="图片"></p><p>在控制台中，我们可以看到正式流量和压测流量的日志已经被分离。</p><p>打开配置的日志文件路径，查看日志分离情况。</p><p><img src="https://static001.geekbang.org/resource/image/d4/e3/d47acfa63eb7ede3cyy516154b1100e3.png?wh=830x256" alt="图片"></p><p>我们再打开日志看看是否显示正常。</p><ul>
+<li>正常日志<br>
+先打开正常日志文件，可以看到日志生产正常。</li>
+</ul><p><img src="https://static001.geekbang.org/resource/image/d7/17/d7fc0f51f40ee8a4028a4575a26fee17.png?wh=1920x370" alt="图片"></p><ul>
+<li>压测日志<br>
+再打开影子目录下的压测日志，查看压测日志也生成正常。</li>
+</ul><p><img src="https://static001.geekbang.org/resource/image/23/42/236619194918664b0bbd265198b99c42.png?wh=1920x380" alt="图片"></p><p>这说明单个服务的日志分离成功了。</p><p>刚才我们介绍了日志隔离方案并分别进行了技术预演。预演成功，接下来，我们就要将相关代码移植到demo系统进行验证了。</p><h3>demo 改造验证</h3><p>首先，我们写个 demo 尝试做一下技术改造验证。</p><p>这里使用的 demo 工程还是 14 讲的示例，主要包括网关、会员系统、购物车系统和订单系统 4 个服务：</p><p><img src="https://static001.geekbang.org/resource/image/ba/27/ba3d569dc9e4f2b98f21b60c46b7dc27.jpg?wh=1920x378" alt="图片"></p><p>接下来我们主要改造会员系统，实现日志隔离技术预演。</p><p><strong>第一步，移植获取标记类。</strong></p><p>快速移植全局 Filter 过滤器和数据上下文类：</p><ul>
+<li>AppContext；</li>
+<li>ContextFilter。</li>
+</ul><p>这个操作前面说过很多次了，这里就不再多赘述了。</p><p>不过在日志隔离改造环节，网关服务需要额外通过实现全局 Filter 类获取标记，然后加入 MDC 上下文中。</p><pre><code class="language-java">@Log4j2
+@Component
+public class ContextFilter implements Filter {
+
+    @Override
+    public void init(FilterConfig filterConfig) throws ServletException {
+        Filter.super.init(filterConfig);
+    }
+
+    @Override
+    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
+        BaggageField dunshan = BaggageField.getByName("dunshan");
+        String value = dunshan.getValue();
+        AppContext appContext = new AppContext();
+        if (StringUtils.isNotBlank(value)) {
+            log.info("压测流量: " + value);
+            appContext.setFlag(value);
+            AppContext.setContext(appContext);
+            MDC.put("dunshan","shadow");
+        } else {
+            log.info("正常流量: " + value);
+            MDC.put("dunshan","produce");
+            AppContext.setContext(appContext);
+        }
+        filterChain.doFilter(servletRequest, servletResponse);
+    }
+
+    @Override
+    public void destroy() {
+        AppContext.removeContext();
+        Filter.super.destroy();
+
+    }
+}
+</code></pre><p><strong>第二步，移植​ L<strong><strong>ogback 配置文件</strong></strong>。</strong></p><p>这里我们把上面 Logback-spring-xml 配置文件快速移植到 member 服务，其他服务也可以按上面的配置做相应改造。为了演示的完整性，我们又继续改造了 demo 中的 cart 和 order 服务。</p><p>改造完成后，启动网关、memeber、cart 、order服务：</p><p><img src="https://static001.geekbang.org/resource/image/67/5f/67028dd784a126c696yy5e30cef5035f.png?wh=1260x220" alt="图片"></p><p><strong>第三步，接口测试验证。</strong></p><p>打开 JMeter 添加请求接口，注意，这个请求也要区分压测流量（带标记的请求）和正常流量（不带标记的请求）。</p><p>请求完成后，日志目录显示的是下面的样子。</p><p><img src="https://static001.geekbang.org/resource/image/97/ab/9761e3db136de7fda7ccfe9f056572ab.png?wh=1596x886" alt="图片"></p><p>我们看到，正常日志与压测日志目录是分开的。</p><p>但是我们还发现，日志打印是混乱的，日志当中有压测日志，也有正常日志，如下所示：</p><p><img src="https://static001.geekbang.org/resource/image/09/d2/0957aa532b706c6d4ed0dda5852be9d2.png?wh=1920x585" alt="图片"></p><p>也就是说，虽然流量已经识别了，日志也分离了，但日志输出是无序的，这显然不是我们想要的结果。</p><p>我们知道 MDC 底层使用的是 ThreadLocal，天然就存在这个缺陷。那么，我们这么办呢？所以在这里，我们考虑引入<strong>数据上下文</strong>对象来解决这个问题。</p><p><strong>第四步，改造数据上下文类。</strong></p><p>修改数据上下文类，我们可以直接把标记存储到 MDC 中去，你可以参考下面的代码：</p><pre><code class="language-java">@Log4j2
+public class AppContext implements Serializable {
+
+    private static final TransmittableThreadLocal&lt;AppContext&gt; contextdunshan = new TransmittableThreadLocal&lt;&gt;();
+
+    private String Flag;
+
+    public static AppContext getContext() {
+        return contextdunshan.get();
+    }
+
+    public static void setContext(AppContext context) {
+        //判断标记
+        if (StringUtils.isNotEmpty(context.getFlag())) {
+            MDC.put("dunshan", "shadow");
+        } else {
+            MDC.put("dunshan", "produce");
+        }
+        contextdunshan.set(context);
+    }
+
+    public static void removeContext() {
+        contextdunshan.remove();
+    }
+
+    public String getFlag() {
+        return Flag;
+    }
+
+    public void setFlag(String Flag) {
+        this.Flag = Flag;
+    }
+
+}
+</code></pre><p><strong>第五步，JMeter 接口测试验证。</strong></p><p>我们再次启动项目，执行第三步的 JMeter 脚本发送请求。</p><p>执行完毕后，我们打开影子目录中的最新日志文件查看一下内容。</p><p><img src="https://static001.geekbang.org/resource/image/bf/f6/bf7cb2d5ce661a8a1dyycb81b511dcf6.png?wh=1920x570" alt="图片"></p><p>可以看到，保存的全部是压测日志，这才是合理的。</p><p>我们再打开正常目录中的日志文件查看下内容。</p><p><img src="https://static001.geekbang.org/resource/image/b6/5f/b65123a7fe1d4279c834ec1623671a5f.png?wh=1920x719" alt="图片"></p><p>可以看到，保存的全部都是正常日志。很好，这就是我们想要的日志隔离效果。</p><p>经过刚才的改造，我们 member、cart、order服务的日志都已经隔离成功了，下面，我们就尝试将这个demo移植到真实系统中去进行改造了。</p><h2>真实系统改造</h2><p>打开 mall 项目，我们还是先对 member 系统进行改造，改造成功后，再移植到其他服务中去。</p><p><strong>第一步，修改 Logback 配置文件。</strong></p><p>把之前 demo 的配置文件放到 mall 中的 logback-spring.xml 中：</p><p><img src="https://static001.geekbang.org/resource/image/7a/03/7a9f2383900859fa67e2349f31b47703.png?wh=1920x1020" alt="图片"></p><p><strong>第二步，修改网关全局过滤器 AuthGlobalFilter。</strong></p><p>在 AuthGlobalFilter 类中加入MDC方法对流量标记进行判断 ，具体判断代码是stringutils.isNotEnpty(dunshan)，如下图所示：</p><p><img src="https://static001.geekbang.org/resource/image/81/2c/816386033340df3406714c28c745c02c.png?wh=1662x698" alt="图片"></p><p><strong>第三步，修改业务系统数据上下文类。</strong></p><p>接下来，我们改造对应业务系统 mall-member 、mall-auth 项目的数据上下文类，可以直接把标记存储到 MDC中。</p><p>参考代码如下：</p><p><img src="https://static001.geekbang.org/resource/image/e9/18/e97d3a38784a3b7954e43f37a6030518.png?wh=1920x775" alt="图片"></p><p><strong>第四步，接口测试验证。</strong></p><p>我们启动网关服务、认证服务和会员服务来验证一下改造结果。</p><ul>
+<li><strong>正常流量（不带 Header 标记）</strong></li>
+</ul><p>首先，我们模拟发送一下正式流量。打开接口文档，测试下会员服务的【获取用户信息接口】。</p><p><img src="https://static001.geekbang.org/resource/image/d7/30/d7dbf7a086a6bfac5c11217256ffdb30.png?wh=1920x796" alt="图片"></p><p>我们可以在控制台看到正常的日志。</p><p><img src="https://static001.geekbang.org/resource/image/f8/99/f817dayy366eeed65119b7b68aaf8399.png?wh=1920x1164" alt="图片"></p><p>接下来，我们查看下正常的日志文件内容。</p><p><img src="https://static001.geekbang.org/resource/image/41/1a/4112f2cyy484121927d835d863e9f61a.png?wh=1920x630" alt="图片"></p><p>可以看到，正常日志生成成功。</p><ul>
+<li><strong>压测流量（带 Header 标记）</strong></li>
+</ul><p>接下来，我们再模拟发送一下压测请求。我们通过 curl 命令增加 Header 标记 ，然后发送一个请求，模拟压测流量。具体命令可以参考下面的代码：</p><pre><code class="language-bash">curl -X GET -H  "Accept:*/*" -H  "Authorization:eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiI3ZDExMTExMSIsInNjb3BlIjpbImFsbCJdLCJpZCI6MjEsImV4cCI6MTYzMzQ0MDAwMywiYXV0aG9yaXRpZXMiOlsi5YmN5Y-w5Lya5ZGYIl0sImp0aSI6IjcwYzYxZDVhLThkYTgtNDU3MS1iNWFmLTRkMmE1Y2FmYTBhNiIsImNsaWVudF9pZCI6InBvcnRhbC1hcHAifQ.jAt-ex0MVNXBAaCvT-A4xB1rpnWYBCxs6om10ujbTvVSNRZ5WFYxW8ZKNfUuFII5GCnh4XL66W0kxKyouCwphjZcPAvsK5PNJlsoBK0yljb-3g4gr4zAPbxoU6MPc0RDEnnXO3bzt4GZWql2rL8-TwitqRolLkLBrrV6OnWChVo" -H  "Request-Origion:Knife4j" -H  "Content-Type:application/x-www-form-urlencoded" -H "dunshan:7DGroup" "http://ip:8201/api/member/sso/feign/info"
+</code></pre><p>测试完成后，我们找到影子目录下的压测日志文件：</p><p><img src="https://static001.geekbang.org/resource/image/23/b1/23e2d8b3ce0a3cbeffyyd7c4f53067b1.png?wh=1920x793" alt="图片"></p><p>可以看到，压测日志也生成成功了。</p><p>到这里，我们的日志隔离改造就成功了。</p><p>另外，我还想说明一点，你可能已经发现了，正常请求和压测请求的用户是一样的。这一点其实我们在<a href="https://time.geekbang.org/column/article/431720">《铺底数据：真实的压测数据应该做成什么样子？》</a>这篇文章中就讲过，因为压测用户是从线上数据脱敏来的，所以正常用户与压测用户是一致的。</p><p>有了上面成功的改造经验，其他的服务就也可以按照目前的方式改造了。</p><h2>总结</h2><p>好了，这节课就讲到这里。刚才，我们完整演示了日志隔离的技术预演和真实系统改造过程。</p><p>日志系统的混乱是每个定位问题人员的恶梦，我想你可能也经历过在微服务分布式架构的汪洋一样的日志中查找问题的痛苦经历。所以日志聚合系统是微服务分布式架构的必备基础设施。</p><p>而在全链路压测的逻辑中，如果没有把压测流量和正式流量做隔离，那出现问题时，查找问题就会累到跳脚了；做日志隔离还有一个好处，就是在日志隔离之后，我们可以把压测日志输出到单独的存储上去，这样就不会因为压测日志增长过快而导致存储空间很快被耗光了。</p><p>在我看来，日志隔离是全链路压测过程中非常必要的改造步骤。刚才，我们演示了 “MDC+Logback+数据上下文”的日志隔离实现逻辑，这是我认为最为合理的解决方案。</p><h2>课后题</h2><p>学完这节课，我想请你思考两个问题：</p><ol>
+<li>除了本文的日志隔离方案，你还有其他的日志隔离方案吗？都有什么优缺点？</li>
+<li>你知道有哪些海量日志抽取的技术方案？</li>
+</ol><p>欢迎你在留言区与我交流讨论。我们下节课见！</p>

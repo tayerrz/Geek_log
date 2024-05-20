@@ -1,0 +1,229 @@
+<p>你好，我是高楼。</p><p>到现在，我们的专栏已经更新了20多讲了，在前面的课程中，你应该也已经看到了，为了真正地把全链路压测拉到地面上来，同时也让你更好地理解我的全链路压测理念，我们专门搭建了一个完整的系统，这个专栏所有的内容都是基于这个系统展开的。这节课，我们就来看看，这个系统是怎么搭建起来的。</p><p>因为整个系统相对比较复杂，有很多需要考虑、部署的细节，所以这节课的内容会比较长。下面这张图是这节课的目录，你可以先整体了解一下这节课的结构，然后对应这张目录图来学习具体的搭建步骤，以免迷失方向。</p><p><img src="https://static001.geekbang.org/resource/image/06/3c/06b108yy64a35bd74469c86b1694893c.jpg?wh=1920x943" alt="图片"></p><p>我会依照云计算的架构特点，自下向上从云虚拟机到微服务应用，介绍整个搭建的过程。</p><h2>一. 云虚拟机</h2><p>云虚拟机负责管理虚拟机的生命周期，包括创建、修改、备份、启停、销毁等。云虚拟机主要是面向资源分配，虚拟机创建出来了云产商就基本没有责任了。至于服务高可用、自动伸缩、监控等这类的功能完全由应用方来处理，云平台不提供支持。云虚拟机适合传统的部署模式，对应用而言和物理机时代没有区别。</p><h3>1. 主机规划</h3><p>在这个系统中，我们主要用到了8 台云虚拟机，下面是具体的硬件配置：</p><p><img src="https://static001.geekbang.org/resource/image/4a/9e/4a0e230dfbd54e88877868f41924369e.png?wh=1103x570" alt="图片"></p><p>我们可以看到，当前云主机总共使用在应用中的资源是：38 C的 CPU 资源，88 G的内存资源。NFS 网络存储服务器不会用在应用中。</p><!-- [[[read_end]]] --><p>关于云虚拟机类型，云产商一般会提供这几个类型：</p><ul>
+<li>通用均衡型（通常比例1:4）；</li>
+<li>计算密集型（通常比例1:2）；</li>
+<li>内存优化型（通常比例1:8以上）；</li>
+<li>图形计算型（带有GPU能力）。</li>
+</ul><p>我们这里选择的云主机类型主要为计算密集型，如下图。</p><p><img src="https://static001.geekbang.org/resource/image/f8/dc/f802782dee88466d9c60ed92d526b3dc.png?wh=1634x719" alt="图片"></p><p>在存储方面，云产商一般会提供高效云盘和SSD两种类型，这里我们选择的是SSD：</p><p><img src="https://static001.geekbang.org/resource/image/63/16/6395f495c81ac7ee390d7677a20f7616.png?wh=1008x247" alt="图片"></p><p>你可能会问，这么一套搞下来，成本要多少呢？我算了一下，我们这个项目，所有云主机加在一起一年大概需要六万左右的费用，这其中还包括了云硬盘、云网络等杂七杂八的费用。</p><p>我们接着来看下云主机规划。这里我把云主机类型按照节点差异分为两类：</p><ul>
+<li>普通节点：</li>
+</ul><p>普通节点主要供非被测系统使用，比如压力机、管理平台等。我们可以采用 Docker、二进制等方式来部署。</p><ul>
+<li>Kubernetes节点：</li>
+</ul><p>Kubernetes节点用于部署项目的应用服务，包括 mall-admin、mall-portal、mall-gateway、mall-member、mall-cart 等。另外 Zipkin、Nacos 等基础组件也都采用 Kubernetes的方式来部署。</p><p>具体的节点规划，你可以参考这张表：</p><p><img src="https://static001.geekbang.org/resource/image/a0/7c/a09c92479c27f915f565ca6f4879757c.jpg?wh=1920x1080" alt="图片"></p><p>在这里，我们规划了一个Kubernetes控制节点。如果你计划搭建高可用 Master 集群，至少需要规划三个Kubernetes控制节点。至于Kubernetes计算节点，结合前面的节点规划，我们在这里配置 7 个 worker 节点，其他的节点会根据需求灵活扩展。</p><p>这里我还想提醒一下，如果你所在的项目需要购买云主机的话，最好提早规划。因为我们之前购买的Kubernetes集群云主机都是包年包月机型，后来想省钱换成按量付费类型（支持停机后不收费功能）的主机，结果发现网络不互通。这可都是血淋淋的教训。</p><h3>2. 操作系统搭建</h3><p>下面，我们再来看下操作系统的搭建。</p><p>目前，行业内主流的基于 x86 架构的 Linux 系统，无非是 CentOS 和 Ubuntu 两种。我们选择了 CentOS 系列来搭建 Linux 系统，主要是考虑到了系统的稳定性。CentOS 来自 RedHat 商业版本的重新编译，它在稳定性、系统优化以及兼容性方面，具有比较完善的测试和发版流程。</p><p>在 CentOS 7 之后的版本中，CentOS 的内核换成了 Linux 3.x，因此，我们这个课程的分析都是基于 Linux 3.x 这个内核版本展开的。</p><p>而大部分的云产商一般会提供下面两种类型的操作系统镜像：</p><ul>
+<li>流行成熟的Linux发行版</li>
+<li>云厂商自有的Linux版本（更适配该产商的硬件）</li>
+</ul><p>因为我们课程的技术栈不想与云产商绑定，所以我们给每台服务器都安装了流行成熟的 CentOS  7.8 的操作系统。云主机安装操作系统非常简单，创建实例的时候选择对应的系统镜像就可以了：</p><p><img src="https://static001.geekbang.org/resource/image/fd/yy/fd93bbd0392993229250405d758yy6yy.png?wh=1005x124" alt="图片"></p><h2>二. Kubernetes 集群</h2><h3>1. 计算资源</h3><p>关于集群计算资源，你可以参考这张表：</p><p><img src="https://static001.geekbang.org/resource/image/56/35/56c111c74bdfb2d79ea2ce72dd36f835.jpg?wh=1920x865" alt="图片"></p><p>我们在做计算资源规划的时候，通常需要考虑不同的应用场景：</p><ul>
+<li>
+<p>传统虚拟化技术的 I/O 损耗较大，对于 I/O 密集型应用，性能敏感的应用，裸金属服务器相比云虚拟机有更好的性能表现；</p>
+</li>
+<li>
+<p>在裸金属服务器上部署应用，有更少的额外资源开销（如虚拟化管理、虚拟机操作系统等），并且可以有更高的部署密度，这可以降低基础设施成本；</p>
+</li>
+<li>
+<p>在裸金属服务器上可以更加灵活地选择网络、存储等设备和软件应用生态。<br>
+如果从实际生产环境考虑，我给你的建议是：</p>
+</li>
+<li>
+<p>对性能极其敏感的应用，如高性能计算，裸金属服务器是较好的选择；</p>
+</li>
+<li>
+<p>云主机支持热迁移，可以有效降低运维成本；</p>
+</li>
+<li>
+<p>在工作实践中，可以为 Kubernetes 集群划分静态资源池和弹性资源池，我们就是这样做的。通常而言，静态资源池可以根据需要选择裸金属服务器或者云主机实例；弹性资源池则可以根据应用负载，使用合适规格的云主机实例来优化成本，避免资源浪费，同时提升弹性供给保障。</p>
+</li>
+</ul><p>由于我们这个系统只是课程的示例项目，为了尽可能压榨服务器资源，节省服务器成本，我们选择了云虚拟机的方案。</p><h3>2. 集群搭建</h3><p>关于集群搭建，我们的节点规划如下：</p><pre><code class="language-bash">[root@s5 k8s]# kubectl get nodes -o wide
+NAME&nbsp; &nbsp;STATUS&nbsp; &nbsp;ROLES&nbsp; &nbsp; AGE&nbsp; &nbsp; VERSION&nbsp; &nbsp;INTERNAL-IP&nbsp; &nbsp; &nbsp; EXTERNAL-IP&nbsp; &nbsp;OS-IMAGE&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; KERNEL-VERSION&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; CONTAINER-RUNTIME
+s10&nbsp; &nbsp; Ready&nbsp; &nbsp; &lt;none&gt;&nbsp; &nbsp;5d1h&nbsp; &nbsp;v1.19.5&nbsp; &nbsp;172.31.184.227&nbsp; &nbsp;&lt;none&gt;&nbsp; &nbsp; &nbsp; &nbsp; CentOS Linux 7 (Core)&nbsp; &nbsp;3.10.0-1127.19.1.el7.x86_64&nbsp; &nbsp;docker://19.3.11
+s11&nbsp; &nbsp; Ready&nbsp; &nbsp; &lt;none&gt;&nbsp; &nbsp;5d1h&nbsp; &nbsp;v1.19.5&nbsp; &nbsp;172.31.184.230&nbsp; &nbsp;&lt;none&gt;&nbsp; &nbsp; &nbsp; &nbsp; CentOS Linux 7 (Core)&nbsp; &nbsp;3.10.0-1127.19.1.el7.x86_64&nbsp; &nbsp;docker://19.3.11
+s12&nbsp; &nbsp; Ready&nbsp; &nbsp; &lt;none&gt;&nbsp; &nbsp;5d1h&nbsp; &nbsp;v1.19.5&nbsp; &nbsp;172.31.184.233&nbsp; &nbsp;&lt;none&gt;&nbsp; &nbsp; &nbsp; &nbsp; CentOS Linux 7 (Core)&nbsp; &nbsp;3.10.0-1127.19.1.el7.x86_64&nbsp; &nbsp;docker://19.3.11
+s5&nbsp; &nbsp; &nbsp;Ready&nbsp; &nbsp; master&nbsp; &nbsp;5d2h&nbsp; &nbsp;v1.19.5&nbsp; &nbsp;172.31.184.225&nbsp; &nbsp;&lt;none&gt;&nbsp; &nbsp; &nbsp; &nbsp; CentOS Linux 7 (Core)&nbsp; &nbsp;3.10.0-1160.31.1.el7.x86_64&nbsp; &nbsp;docker://19.3.11
+s6&nbsp; &nbsp; &nbsp;Ready&nbsp; &nbsp; &lt;none&gt;&nbsp; &nbsp;5d1h&nbsp; &nbsp;v1.19.5&nbsp; &nbsp;172.31.184.226&nbsp; &nbsp;&lt;none&gt;&nbsp; &nbsp; &nbsp; &nbsp; CentOS Linux 7 (Core)&nbsp; &nbsp;3.10.0-1127.19.1.el7.x86_64&nbsp; &nbsp;docker://19.3.11
+s7&nbsp; &nbsp; &nbsp;Ready&nbsp; &nbsp; &lt;none&gt;&nbsp; &nbsp;5d1h&nbsp; &nbsp;v1.19.5&nbsp; &nbsp;172.31.184.224&nbsp; &nbsp;&lt;none&gt;&nbsp; &nbsp; &nbsp; &nbsp; CentOS Linux 7 (Core)&nbsp; &nbsp;3.10.0-1127.18.2.el7.x86_64&nbsp; &nbsp;docker://19.3.11
+s8&nbsp; &nbsp; &nbsp;Ready&nbsp; &nbsp; &lt;none&gt;&nbsp; &nbsp;5d1h&nbsp; &nbsp;v1.19.5&nbsp; &nbsp;172.31.184.229&nbsp; &nbsp;&lt;none&gt;&nbsp; &nbsp; &nbsp; &nbsp; CentOS Linux 7 (Core)&nbsp; &nbsp;3.10.0-1127.19.1.el7.x86_64&nbsp; &nbsp;docker://19.3.11
+s9&nbsp; &nbsp; &nbsp;Ready&nbsp; &nbsp; &lt;none&gt;&nbsp; &nbsp;5d1h&nbsp; &nbsp;v1.19.5&nbsp; &nbsp;172.31.184.228&nbsp; &nbsp;&lt;none&gt;&nbsp; &nbsp; &nbsp; &nbsp; CentOS Linux 7 (Core)&nbsp; &nbsp;3.10.0-1127.19.1.el7.x86_64&nbsp; &nbsp;docker://19.3.11
+</code></pre><p>集群搭建的具体步骤，你可以参考下面这两个文档进行部署：</p><ul>
+<li>单 Master 集群：<a href="https://mp.weixin.qq.com/s/eQOMt3dz1P2JwezDaoZGzg">使用 kubeadm 安装单master kubernetes 集群（脚本版）</a></li>
+<li>高可用方案： <a href="https://mp.weixin.qq.com/s/bdq4GySQWjcIjJmn0ZD80g">Kubernetes 高可用集群落地二三事</a></li>
+</ul><p>安装的负载均衡组件如下：</p><p><img src="https://static001.geekbang.org/resource/image/37/16/37b9dfc3054964f73df1076121ffd016.jpg?wh=1920x732" alt="图片"></p><p>关于Traefik 搭建的具体步骤，你可以按照下面这个文档进行部署：</p><ul>
+<li><a href="https://mp.weixin.qq.com/s/YGfndOfsbIsSs3ahmOgWCw">Kubernetes 集群部署 Ingress Traefik</a></li>
+</ul><p>如果你没有Kubernetes的使用基础，那么我建议学习一下这几篇入门文章：</p><ul>
+<li><a href="https://mp.weixin.qq.com/s/X2Z_a_eYq12O6yTQmRRxfw">Kubernetes 集群基本概念</a></li>
+<li><a href="https://mp.weixin.qq.com/s/dSbCK_ms4YMoEvqp0afNZg">k8s入门篇-Kubernetes的基本概念和术语</a></li>
+<li><a href="https://mp.weixin.qq.com/s/EPdOEwFaoc-hI27C0v3urA">k8s命令篇-Kubernetes工作实用命令集结号</a></li>
+<li><a href="https://mp.weixin.qq.com/s/xYjR5_WZNhny_0RdjM1tpA">Kubernetes 集群常用操作总结</a></li>
+</ul><h3>3. 插件安装</h3><p>我们需要安装的插件主要有三种：网络插件、存储插件和组件。</p><p>对于网络插件，我们选用的是目前主流的网络插件 Flannel。如果你的系统有其它选型需求，那你可以参考下面这篇文章，这里我就不做赘述了。</p><ul>
+<li><a href="https://mp.weixin.qq.com/s/H4ncgG0AqsmpPSg3ICBP3g">Kubernetes 网络插件（CNI）超过 10Gbit/s 的基准测试结果</a></li>
+</ul><p>如果你在阿里云上安装 k8s，建议使用 Flannel，因为有多个案例表明 Calico 与阿里云存在兼容性问题。</p><p>安装 Flannel 插件的具体步骤，你可以参考下文的第11章。</p><ul>
+<li><a href="https://blog.csdn.net/zuozewei/article/details/108182174">使用 kubeadm 安装单master kubernetes 集群（手动版）</a></li>
+</ul><p>关于存储插件，我们选用的是 NFS 网络存储。因为 NFS 相对简单，上手快，我们只需要部署一个NFS服务，再由Kubernetes提供一个自动配置卷程序，然后通过 StoageClass 动态配置 Kubernetes 持久就可以了。而且在性能上，NFS 也能满足我们这个系统的需求。</p><p>只不过，NFS 并不是高可用方案。如果你是在生产环境中使用，可以考虑把 Ceph 作为存储选型方案。Ceph 是一个统一的分布式存储系统，也是高可用存储方案，并且可以提供比较好的性能、可靠性和可扩展性。但是，Ceph 部署起来更复杂些，同时维护也比 NFS 困难。</p><p>我把 NFS 和 Ceph 的详细安装步骤放在这里，你如果有需要，可以参考学习。</p><ul>
+<li>NFS： <a href="https://mp.weixin.qq.com/s/-jLNloENj7za4N91GcSGGQ">Kubernetes 如何安装 NFS-Subdir-External-Provisioner存储插件？</a></li>
+<li>Ceph： <a href="https://mp.weixin.qq.com/s/tww0dPNeFNR_WaEWUh97ZQ">Kubernetes 集群分布式存储插件 Rook Ceph部署</a></li>
+</ul><p>另外，不要忘了，NFS 配置中还需要这两个组件：</p><p><img src="https://static001.geekbang.org/resource/image/dc/38/dca27690dda1fbca0d36a72424de8d38.jpg?wh=1920x648" alt="图片"></p><p>NFS-Subdir-External-Provisioner 是对 <a href="https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner">nfs-client-provisioner</a> 的扩展，但是 nfs-client-provisioner 已经不再提供更新，而且 nfs-client-provisioner 的 GitHub 仓库已经迁移到<a href="https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner"> NFS-Subdir-External-Provisioner</a> 的仓库了。</p><h3>4. Kubernetes管理平台</h3><p>安装组件：</p><p><img src="https://static001.geekbang.org/resource/image/1a/83/1a73728efd188e44137240a9aec44d83.jpg?wh=1920x523" alt="图片"></p><p>Kuboard 采用可视化UI的方式来管理应用和组件，降低了Kubernetes集群的使用门槛。下面我们看看怎么部署 Kuboard 组件。</p><p>第一步，k8s 集群执行资源文件：</p><pre><code class="language-shell">kubectl apply -f https://kuboard.cn/install-script/kuboard.yaml
+kubectl apply -f https://addons.kuboard.cn/metrics-server/0.3.7/metrics-server.yaml
+</code></pre><pre><code class="language-bash">[root@s5 ~]# kubectl apply -f https://kuboard.cn/install-script/kuboard.yaml
+deployment.apps/kuboard created
+service/kuboard created
+serviceaccount/kuboard-user created
+clusterrolebinding.rbac.authorization.k8s.io/kuboard-user created
+serviceaccount/kuboard-viewer created
+clusterrolebinding.rbac.authorization.k8s.io/kuboard-viewer created
+[root@s5 ~]#&nbsp;
+[root@s5 ~]# kubectl apply -f https://addons.kuboard.cn/metrics-server/0.3.7/metrics-server.yaml
+clusterrole.rbac.authorization.k8s.io/system:aggregated-metrics-reader created
+clusterrolebinding.rbac.authorization.k8s.io/metrics-server:system:auth-delegator created
+rolebinding.rbac.authorization.k8s.io/metrics-server-auth-reader created
+clusterrole.rbac.authorization.k8s.io/system:metrics-server created
+clusterrolebinding.rbac.authorization.k8s.io/system:metrics-server created
+apiservice.apiregistration.k8s.io/v1beta1.metrics.k8s.io created
+serviceaccount/metrics-server created
+deployment.apps/metrics-server created
+service/metrics-server created
+[root@s5 ~]#&nbsp;
+</code></pre><p>第二步，把 Kuboard 安装好后，我们看一下 Kuboard 的运行状态：</p><pre><code class="language-shell">kubectl get pods -l k8s.kuboard.cn/name=kuboard -n kube-system
+</code></pre><p>输出结果：</p><pre><code class="language-shell">[root@s5 ~]# kubectl get pods -l k8s.kuboard.cn/name=kuboard -n kube-system
+NAME&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;READY&nbsp; &nbsp;STATUS&nbsp; &nbsp; RESTARTS&nbsp; &nbsp;AGE
+kuboard-74c645f5df-bsj4k&nbsp; &nbsp;1/1&nbsp; &nbsp; &nbsp;Running&nbsp; &nbsp;0&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 98s
+[root@s5 ~]#&nbsp;
+</code></pre><p>这个结果表明 kuboard 已经部署成功了。<br>
+接着，我们获取管理员 Token 。这一步是为了登录访问 Kuboard，检查组件是否成功运行。</p><pre><code class="language-shell"># 可在第一个 Master 节点上执行此命令
+echo $(kubectl -n kube-system get secret $(kubectl -n kube-system get secret | grep kuboard-user | awk '{print $1}') -o go-template='{{.data.token}}' | base64 -d)
+</code></pre><pre><code class="language-bash">[root@s5 k8s]# echo $(kubectl -n kube-system get secret $(kubectl -n kube-system get secret | grep kuboard-user | awk '{print $1}') -o go-template='{{.data.token}}' | base64 -d)
+eyJhbGciOiJSUzI1NiIsImtpZCI6IldTYlJYVXIzbWZNUnBSczF1ZFc5cmRQbEp2UlFtbXREZDVCSEtzd09kU2MifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlLXN5c3RlbSIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJrdWJvYXJkLXVzZXItdG9rZW4tZGNwMmYiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoia3Vib2FyZC11c2VyIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiODY2MWU1NzAtYWMyNC00YzA0LTgxNmYtMTM3YWMwOWU0MTcxIiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50Omt1YmUtc3lzdGVtOmt1Ym9hcmQtdXNlciJ9.lHhr261HMdqGpMWhGVt9mOty2QpWAcuKaGYZ2FwlJPof4iddGSi6O5_SgZHi8wj4FrOiH3xwUMGGqiIcxhp6VuTFch7tUeBQ3x40dvt3t1u6kogZBMz-k2K39fnBtvcFJV9hghIXoxMsH3E09wjKrJmq0bXUfPicdCMbbwpRNXt97pqGIPBrhNtqX_-agmLSlaiqG3rTZIwGAgsBmcJVHeGhgme2PAMwuiSXUoi0W22BeH-c91_rLJ4LrB9svrhaWf_dltQ-mLT4lfnr_Imk-Dvo9Zhmm8Y9_OOe9VkWRJVtJpnVYWs9WKjMGLeYNL_h8jgNN7cq-0vxddAT31rdYQ
+</code></pre><p>通过检查部署我们了解到，Kuboard Service 使用了 NodePort 的方式暴露服务，NodePort 为 32567。因此，我们可以按照下面这个方式访问 Kuboard：</p><pre><code class="language-bash">http://任意一个Worker节点的IP地址:32567/
+</code></pre><p>然后，在登录界面中输入管理员 Token，这样就可以进入到 Kuboard 集群的概览页了。</p><p><img src="https://static001.geekbang.org/resource/image/3b/5b/3b6e5705851ce8d1c4f25169e1bb765b.png?wh=1915x997" alt="图片"></p><p>注意，如果你使用的是阿里云、腾讯云等云服务，那么你可以在对应的安全组设置里，开放 worker 节点 32567 端口的入站访问，你也可以修改 Kuboard.yaml 文件，使用自己定义的 NodePort 端口号。</p><h2></h2><h2>三. 依赖组件</h2><h3>1. 部署清单</h3><p><img src="https://static001.geekbang.org/resource/image/f9/04/f962c721394ceba314207e729b209804.jpg?wh=1920x1080" alt="图片"></p><h3>2. 安装部署</h3><p>对于上述依赖组件的安装部署，我整理了对应的教程放在这里，如果有兴趣你可以尝试一下。</p><p>MySQL 的二进制安装方式，在网上的教程多如牛毛，我在这里就不介绍了，如果你想知道怎么在Kubernetes下部署 MySQL，你可以参考这个链接中的详细步骤：</p><ul>
+<li><a href="https://mp.weixin.qq.com/s/-DEgzyqZKOApjynsrdLPmw">Kubernetes 集群部署 MySQL+ mysqld_exporter (单节点)</a></li>
+<li><a href="https://mp.weixin.qq.com/s/4YSx4a2oqjrp1f6wNQgR-g">如何在 Kubernetes 集群中搭建一个复杂的 MySQL 数据库</a></li>
+</ul><p>Elasticsearch 集群的部署可以参考：</p><ul>
+<li><a href="https://mp.weixin.qq.com/s/VAlbWoSf_16-Cf5nIwEShg">Kubernetes Helm3 部署 Elasticsearch &amp; Kibana 7 集群</a></li>
+</ul><p>Weave Scope的部署可以参考：</p><ul>
+<li><a href="https://mp.weixin.qq.com/s/QEB2UkJC14BXcZKfxOsrxA">Kubernetes 集群可视化监控之 Weave Scope 入门​</a></li>
+</ul><p>镜像仓库 Harbor 的部署可以参考：</p><ul>
+<li><a href="https://mp.weixin.qq.com/s/_0hEWz7TUvYGASg9I3az4g">Kubernetes 集群仓库 harbor Helm3 部署</a></li>
+</ul><p>Nacos 的部署可以参考：</p><ul>
+<li>Docker 单机模式： <a href="https://nacos.io/zh-cn/docs/quick-start-docker.html">Nacos Docker 快速开始</a></li>
+<li>Kubernetes：<a href="https://mp.weixin.qq.com/s/gA-MtApZXTSF1TtR9Jj4OA">Kubernetes 集群部署nacos 1.4（集群版）</a></li>
+</ul><p>Redis、RabbitMQ、MongoDB 单机部署的部署可以参考：</p><ul>
+<li><a href="https://mp.weixin.qq.com/s/SFCeHlChDQY3zgulnk1D3g">Kubernetes 集群部署 Redis + redis_exporter (单点)</a></li>
+<li><a href="https://mp.weixin.qq.com/s/QGCvYvWz60o_qBX6YbZCFw">Kubernetes 集群部署 RabbitMQ + exporter (单节点)</a></li>
+<li><a href="https://mp.weixin.qq.com/s/lCeWAC4tbh_624f7oDUs2g">Kubernetes 集群部署 MongoDB+exporter (单节点)</a></li>
+</ul><h2>四. 监控组件</h2><h3>1. 全局监控</h3><p>不知道你还记不记得我们这个系统的架构：</p><p><img src="https://static001.geekbang.org/resource/image/2f/4b/2f032901efyy2d9f9e3df8f123e8534b.png?wh=1673x926" alt="图片"></p><p>根据这个系统的架构，我们选择的工具需要监控到这几个层面：</p><ul>
+<li>第一层，云虚拟机；</li>
+<li>第二层，Kubernetes套件；</li>
+<li>第三层，各种应用所需要的技术组件。</li>
+</ul><p>其实，有了上面的系统架构，监控设计大体的轮廓就有了。对于我们这个课程所用的系统，全局监控如下所示：</p><p><img src="https://static001.geekbang.org/resource/image/71/b5/71e39cd615bb0ac4b322fe638e1918b5.jpg?wh=1960x826" alt=""><br>
+从上图来看，我们使用 Prometheus/Grafana/Spring Boot Admin/Zipkin/Weave Scope/ELFK/Sentinel 就可以实现具有全局视角的第一层监控。对于工具中没有覆盖的第一层计数器，我们只能在执行场景时再执行命令来补充了。</p><h3>2. 部署清单</h3><p><img src="https://static001.geekbang.org/resource/image/97/yy/97d7de1b543c21019d39ae610ca278yy.jpg?wh=1788x997" alt="图片"></p><h3>3. 安装部署</h3><p>对于上面这些监控工具的部署，我也把相应的安装教程放在这里供你参考学习。</p><p>Kubernetes集群资源监控的部署：</p><ul>
+<li><a href="https://mp.weixin.qq.com/s/AOl_z0zMuPzRlf36J6OLMg">Kubernetes 集群监控 kube-prometheus 部署</a></li>
+<li><a href="https://mp.weixin.qq.com/s/T1Yhbw2efw-wjKu1PZyudg">Kubernetes 集群监控 controller-manager &amp; scheduler 组件</a></li>
+<li><a href="https://mp.weixin.qq.com/s/chvukvjmCDvrYqYapRCEkA">Kubernetes 集群监控 ETCD 组件</a></li>
+</ul><p>日志聚合部署的部署：</p><ul>
+<li><a href="https://mp.weixin.qq.com/s/7shBCfpKRBBQDsutSpClhQ">Kubernetes 集群日志监控 EFK 安装</a></li>
+</ul><p>依赖组件的部署：</p><ul>
+<li><a href="https://mp.weixin.qq.com/s/yuAU-qWeTr4svaSI497sbQ">Kubernetes 集群监控 kube-prometheus 自动发现</a></li>
+</ul><p>APM 链路跟踪的部署：</p><ul>
+<li><a href="https://mp.weixin.qq.com/s/xTr3IBBUggXdCGL047RF0Q">Kubnernetes 集群部署 Zipkin+Kafka+ElasticSearch 实现链路追踪</a></li>
+</ul><h2>五. 微服务</h2><h3>1. 项目介绍</h3><p>在搭建这个课程所用的系统时，我采用了微服务的架构，这也是当前主流的技术架构。</p><p>如果你有兴趣了解详细的项目介绍，可以参考这篇文章：<a href="https://mp.weixin.qq.com/s/a8nDBbkuvSjreaCxuM2PuQ">《微服务电商项目技术全解析》</a>。这里面主要介绍了该项目的一些预备知识、系统结构、主要技术栈以及核心组件。此外，还有相关的运行效果截图。</p><h3>2. 拉取源代码</h3><p>我们把 Git clone 项目源代码下载到本地，来部署我们的被测系统：</p><pre><code class="language-shell">git clone https://github.com/xncssj/7d-mall-microservice.git
+</code></pre><h3>3. 修改 Nacos 配置</h3><p>我们先将项目 config 目录下的配置包导入到 Nacos 中，然后根据自己的实际需要修改相关配置。</p><p>接着，我们将配置信息导入到 Nacos 中后，会显示这样的信息：</p><p><img src="https://static001.geekbang.org/resource/image/92/11/92b7f9bf9ed9f7786e7b99ffece13111.png?wh=1907x953" alt="图片"></p><p>请注意，我们修改的配置文件主要是每个单体服务下的 application-prod.yml 和 bootstrap-prod.yml。因为这两个全局配置文件，都是服务容器内加载的配置文件。</p><h3>4. 镜像打包及推送</h3><p>我们使用 Java 语言的 IDE （推荐 IDEA ）打开项目工程。</p><p>首先，修改项目根目录下的 pom.xml 文件：</p><pre><code class="language-xml">&lt;properties&gt;
+    &lt;!--改为你自己的 Docker 服务远程访问地址--&gt;
+    &lt;docker.host&gt;http://172.16.106.237:2375&lt;/docker.host&gt;
+&lt;/properties&gt;
+</code></pre><p>在 IDEA 的右边 Maven 标签页，我们可以找到 root 工程下的 package 按钮，选中并执行：</p><p><img src="https://static001.geekbang.org/resource/image/e5/42/e5abee1a643b6cfab36620a9b5496842.png?wh=250x702" alt="图片"></p><p>然后，在编译的远程 Docker 主机上，我们修改所有服务的镜像标签名称。之后，再推送镜像到 Docker 仓库。</p><h3>5. 导入数据库</h3><p>这一步需要将项目 document/sql 目录下的 SQL 脚本导入到 MySQL 数据库中。</p><h3>6. 初始化依赖组件</h3><h4>6.1 RabbitMQ</h4><p>第一步，进入 RabbitMQ 容器并开启管理功能：</p><pre><code class="language-shell">#登录容器的时候需要注意到容器支持的 shell 是什么。
+kubectl exec -it &lt;pod-name&gt; -n &lt;ns-name&gt; bash
+kubectl exec -it &lt;pod-name&gt; -n &lt;ns-name&gt; sh
+
+root@cloud-rabbitmq-5b49d784c-gbr8m:/# rabbitmq-plugins enable rabbitmq_management
+Enabling plugins on node rabbit@cloud-rabbitmq-5b49d784c-gbr8m:
+rabbitmq_management
+The following plugins have been configured:
+  rabbitmq_management
+  rabbitmq_management_agent
+  rabbitmq_web_dispatch
+Applying plugin configuration to rabbit@cloud-rabbitmq-5b49d784c-gbr8m...
+Plugin configuration unchanged.
+</code></pre><p>因为 RabbitMQ Service 使用 NodePort 的方式暴露控制台地址，比如 NodePort 为 15672。所以，第二步，我们访问地址 <a href="http://xn--IP-rm4eu79a9miiio:15672/">http://计算节点IP:15672/</a> 地址，查看是否安装成功：</p><p><img src="https://static001.geekbang.org/resource/image/85/cd/85f0c673661e98de473841a238a8a7cd.png?wh=440x171" alt="图片"></p><p>第三步，输入账号密码并登录guest/guest。</p><p>第四步，创建帐号并设置其角色为管理员 mall/mall。</p><p><img src="https://static001.geekbang.org/resource/image/aa/27/aab6efeb759a35d60fe1eacc32a16727.png?wh=1056x652" alt="图片"></p><p>第五步，创建一个新的虚拟 host 为 /mall。</p><p><img src="https://static001.geekbang.org/resource/image/e2/76/e27be6f50d9674c2eecdaf72ba7cf876.png?wh=1051x502" alt="图片"></p><p>第六步，点击 mall 用户进入用户配置页面，给 mall 用户配置该虚拟 host 的权限。</p><p><img src="https://static001.geekbang.org/resource/image/8c/ed/8c2d86835779258a786be6f2a72937ed.png?wh=675x753" alt="图片"></p><p>到这里，RabbitMQ 的初始化就完成了。</p><h4>6.2 Elasticsearch</h4><p>安装中文分词器 IKAnalyzer，并重新启动：</p><pre><code class="language-shell">#此命令需要在容器中运行
+elasticsearch-plugin install https://github.com/medcl/elasticsearch-analysis-ik/releases/download/v7.6.2/elasticsearch-analysis-ik-7.6.2.zip
+</code></pre><h3>7. 使用 yaml 资源文件部署应用</h3><p>将项目 document/k8s 目录下的 yaml 资源文件中的 Dokcer 镜像，修改为自己的 Tag 并上传到 k8s 集群中执行：</p><pre><code class="language-shell">kubectl apply -f k8s/
+</code></pre><h2>六. 运行效果展示</h2><p>前面的环境搭建完成了，最后我们一起来看下运行效果。</p><h3>1. Kubernetes 集群</h3><p>Kubernetes 集群：</p><pre><code class="language-shell">&nbsp;~  kubectl get nodes
+NAME&nbsp; &nbsp;STATUS&nbsp; &nbsp;ROLES&nbsp; &nbsp; AGE&nbsp; &nbsp; VERSION
+s10&nbsp; &nbsp; Ready&nbsp; &nbsp; &lt;none&gt;&nbsp; &nbsp;5d8h&nbsp; &nbsp;v1.19.5
+s11&nbsp; &nbsp; Ready&nbsp; &nbsp; &lt;none&gt;&nbsp; &nbsp;5d8h&nbsp; &nbsp;v1.19.5
+s12&nbsp; &nbsp; Ready&nbsp; &nbsp; &lt;none&gt;&nbsp; &nbsp;5d8h&nbsp; &nbsp;v1.19.5
+s5&nbsp; &nbsp; &nbsp;Ready&nbsp; &nbsp; master&nbsp; &nbsp;5d8h&nbsp; &nbsp;v1.19.5
+s6&nbsp; &nbsp; &nbsp;Ready&nbsp; &nbsp; &lt;none&gt;&nbsp; &nbsp;5d8h&nbsp; &nbsp;v1.19.5
+s7&nbsp; &nbsp; &nbsp;Ready&nbsp; &nbsp; &lt;none&gt;&nbsp; &nbsp;5d8h&nbsp; &nbsp;v1.19.5
+s8&nbsp; &nbsp; &nbsp;Ready&nbsp; &nbsp; &lt;none&gt;&nbsp; &nbsp;5d8h&nbsp; &nbsp;v1.19.5
+s9&nbsp; &nbsp; &nbsp;Ready&nbsp; &nbsp; &lt;none&gt;&nbsp; &nbsp;5d8h&nbsp; &nbsp;v1.19.5
+&nbsp;~ 
+</code></pre><p>微服务管理：</p><p><img src="https://static001.geekbang.org/resource/image/3a/a3/3a2721f42318ca30d970a0bcc809d9a3.png?wh=1917x996" alt="图片"></p><h3>2. 微服务</h3><p>部署架构图：</p><p><img src="https://static001.geekbang.org/resource/image/2f/4b/2f032901efyy2d9f9e3df8f123e8534b.png?wh=1673x926" alt="图片"></p><p>API 文档：</p><p><img src="https://static001.geekbang.org/resource/image/e4/fb/e43b2826b17305a2f759bdf3697564fb.png?wh=1917x1002" alt="图片"></p><p>调用链监控：</p><p><img src="https://static001.geekbang.org/resource/image/25/c8/2589ff807a90609f80b08209e1b85ac8.png?wh=1913x997" alt="图片"></p><p><img src="https://static001.geekbang.org/resource/image/2c/af/2ce6b93d67eaa781e45772b7a245b8af.png?wh=1917x998" alt="图片"></p><p><img src="https://static001.geekbang.org/resource/image/cd/44/cd94913bb15891d8811eec8ca70f2b44.png?wh=1486x602" alt="图片"></p><p>服务注册：</p><p><img src="https://static001.geekbang.org/resource/image/92/11/92b7f9bf9ed9f7786e7b99ffece13111.png?wh=1907x953" alt="图片"></p><p>服务监控:</p><p><img src="https://static001.geekbang.org/resource/image/19/1e/1943ef1fe1af579813a50623305d4d1e.png?wh=1900x965" alt="图片"></p><p>日志聚合：</p><p><img src="https://static001.geekbang.org/resource/image/dc/82/dc30e55e731729fefbc46b4270cd2382.png?wh=1918x966" alt="图片"></p><p>配置管理：</p><p><img src="https://static001.geekbang.org/resource/image/89/78/89c301c7d716d390d658fa9107266378.png?wh=1917x966" alt="图片"></p><p>系统保护：</p><p><img src="https://static001.geekbang.org/resource/image/f1/df/f1d46b00991361b7d880ce23cd74cfdf.jpg?wh=1920x969" alt="图片"></p><p>容器仓库：</p><p><img src="https://static001.geekbang.org/resource/image/81/4b/81ec549df56997408e96953453a48a4b.png?wh=1896x929" alt="图片"></p><h3>3. 资源监控</h3><p>Kubernetes集群资源监控：</p><p><img src="https://static001.geekbang.org/resource/image/cf/bd/cf6a0965ea9a71fa17ee954784bde3bd.png?wh=1913x995" alt="图片"></p><p>Linux 资源监控：</p><p><img src="https://static001.geekbang.org/resource/image/14/11/1491a3f54d2665da46f4988a1232d211.png?wh=1914x996" alt="图片"></p><p>MySQL 资源监控：</p><p><img src="https://static001.geekbang.org/resource/image/45/20/45e0b30e91f415ef260b30df56906120.png?wh=1853x917" alt="图片"></p><p>RabbitMQ 资源监控：</p><p><img src="https://static001.geekbang.org/resource/image/71/a2/71114d5422e1def11ca64f616c00efa2.png?wh=1861x963" alt="图片"></p><p>MongoDB 数据库资源监控：</p><p><img src="https://static001.geekbang.org/resource/image/15/27/152247bdabe28da0d42476ede1c66f27.png?wh=1857x966" alt="图片"></p><p>Kubernetes etcd 资源监控：</p><p><img src="https://static001.geekbang.org/resource/image/df/f4/df7b8d87598971c7575bce39e99e6af4.png?wh=1915x996" alt="图片"></p><p>Kubernetes API Server 资源监控：</p><p><img src="https://static001.geekbang.org/resource/image/3e/04/3e3e12ce0e1ca4f5d84379c3c9e15104.png?wh=1909x963" alt="图片"></p><p>Kubernetes 服务拓扑：</p><p><img src="https://static001.geekbang.org/resource/image/fb/be/fbd7534d614295ba3e3c33a3670d16be.png?wh=1919x969" alt="图片"></p><h2>总结</h2><p>这节课的内容包括了云环境的说明、技术组件的具体搭建过程、示例系统的搭建过程以及运行效果。经过上面所有的步骤，我们就把整个课程涉及的所有技术组件、示例系统完全搭建起来了。</p><p>而我之所以选择这样的技术栈，主要有三方面的考虑：</p><ol>
+<li><strong>核心优势</strong></li>
+</ol><ul>
+<li>任务调度：为集群系统中的任务提供调度服务，自动将服务按资源需求分配到资源限制的计算节点；</li>
+<li>资源隔离：为产品提供管控与服务节点隔离能力，保证研发应用和管控服务不产生相互的影响；</li>
+<li>高可用能力：自动监控服务运行，根据运行情况对失效的服务进行自动重启恢复；</li>
+<li>网络互联互通能力：提供统一的IP地址分配和网络互通能力；</li>
+<li>统一编排管理能力：结合 Gitlab 和 k8s ，对输出的产品进行统一的编排管理；</li>
+<li>公共产品组件可以为团队提供统一部署、验证、授权、调度和管控能力，为私有云服务提供基础性的支撑。</li>
+</ul><p><strong>2. 核心设施平台（ IaaS 云）</strong></p><ul>
+<li>提供计算、网络、存储等核心资源设备的虚拟化；</li>
+<li>支持不同操作系统，包括主流的 Win 和 Linux 系统；</li>
+<li>提供主要的三种服务：云主机、云网络、云硬盘；</li>
+<li>提供可视化 Web UI；</li>
+<li>提供 k8s 集群（容器云）规划、部署和运营；</li>
+<li>支持多种计算、存储和网络方案。</li>
+</ul><p><strong>3. 基础服务平台（ PaaS 云）</strong></p><ul>
+<li>提供数据存储：支持常见 NFS 、Ceph RBD、Local Volume 等；</li>
+<li>提供应用服务：支持自愈和自动伸缩、调度和发布、负载均衡等；</li>
+<li>提供运维管理：支持日志监控、资源监控、消息告警等。</li>
+</ul><p>我们这个系统采用的技术栈，是当前技术市场中流行的主流技术栈，这样的环境具有很高的借鉴价值。而且，从我们要表达的 RESAR 全链路压测和逻辑来说，也说明 RESAR 全链路压测理念是足以支撑当前的技术栈的。</p><p>有了主流技术栈的技术能力，再有我们的性能分析逻辑思维的落地，不能说天下无双，也是够你横霸一方，独挡一面的了。</p><p>这节课的内容非常多，希望你能够好好消化吸收。我在这里只是给你提供了我们项目的选择和理由，我们项目的选择可能不是最适合你的，如果你有其他想法，也欢迎在留言区和我交流讨论。另外在文稿的最后，我还给你汇总了你可能想要参考的文章链接，希望能让你有所收获。</p><h2>课后题</h2><p>学完这节课，请你思考两个问题：</p><ol>
+<li>你有没有搭建过云原生系统，谈谈你对云原生系统搭建的心得！</li>
+<li>引入 k8s 后，你觉得企业内的基础设施最大的变化是什么？</li>
+</ol><p>欢迎你在留言区与我交流讨论。当然了，你也可以把这节课分享给你身边的朋友，他们的一些想法或许会让你有更大的收获。我们下节课见！</p><h2>参考链接汇总</h2><ol>
+<li>Kubernetes 集群搭建：</li>
+</ol><ul>
+<li>单 Master 集群：<a href="https://mp.weixin.qq.com/s/eQOMt3dz1P2JwezDaoZGzg">使用 kubeadm 安装单master kubernetes 集群（脚本版）</a></li>
+<li>高可用方案： <a href="https://mp.weixin.qq.com/s/bdq4GySQWjcIjJmn0ZD80g">Kubernetes 高可用集群落地二三事</a></li>
+</ul><ol start="2">
+<li>Kubernetes的使用基础：</li>
+</ol><ul>
+<li><a href="https://mp.weixin.qq.com/s/X2Z_a_eYq12O6yTQmRRxfw">Kubernetes 集群基本概念</a></li>
+<li><a href="https://mp.weixin.qq.com/s/dSbCK_ms4YMoEvqp0afNZg">k8s入门篇-Kubernetes的基本概念和术语</a></li>
+<li><a href="https://mp.weixin.qq.com/s/EPdOEwFaoc-hI27C0v3urA">k8s命令篇-Kubernetes工作实用命令集结号</a></li>
+<li><a href="https://mp.weixin.qq.com/s/xYjR5_WZNhny_0RdjM1tpA">Kubernetes 集群常用操作总结</a></li>
+</ul><ol start="3">
+<li>
+<p>Kubernetes网络插件选型：<a href="https://mp.weixin.qq.com/s/H4ncgG0AqsmpPSg3ICBP3g">Kubernetes 网络插件（CNI）超过 10Gbit/s 的基准测试结果</a></p>
+</li>
+<li>
+<p>Kubernetes存储插件：</p>
+</li>
+</ol><ul>
+<li>NFS部署：  <a href="https://mp.weixin.qq.com/s/-jLNloENj7za4N91GcSGGQ">Kubernetes 如何安装 NFS-Subdir-External-Provisioner存储插件？</a></li>
+<li>Ceph部署： <a href="https://mp.weixin.qq.com/s/tww0dPNeFNR_WaEWUh97ZQ">Kubernetes 集群分布式存储插件 Rook Ceph部署</a></li>
+</ul><ol start="5">
+<li>Kubernetes下的MySQL部署：<a href="https://mp.weixin.qq.com/s/4YSx4a2oqjrp1f6wNQgR-g">如何在 Kubernetes 集群中搭建一个复杂的 MySQL 数据库</a></li>
+<li>Elasticsearch 集群的部署：<a href="https://mp.weixin.qq.com/s/VAlbWoSf_16-Cf5nIwEShg">Kubernetes Helm3 部署 Elasticsearch &amp; Kibana 7 集群</a></li>
+<li>镜像仓库 Harbor 的部署：<a href="https://mp.weixin.qq.com/s/_0hEWz7TUvYGASg9I3az4g">Kubernetes 集群仓库 harbor Helm3 部署</a></li>
+<li>Nacos 的部署：</li>
+</ol><ul>
+<li>Docker 单机模式： <a href="https://nacos.io/zh-cn/docs/quick-start-docker.html">Nacos Docker 快速开始</a></li>
+<li>Kubernetes：<a href="https://mp.weixin.qq.com/s/gA-MtApZXTSF1TtR9Jj4OA">Kubernetes 集群部署 nacos 1.4（集群版）</a></li>
+</ul><ol start="9">
+<li>Redis、RabbitMQ、MongoDB 单机部署的部署：</li>
+</ol><ul>
+<li><a href="https://mp.weixin.qq.com/s/SFCeHlChDQY3zgulnk1D3g">Kubernetes 集群部署 Redis + redis_exporter (单点)</a></li>
+<li><a href="https://mp.weixin.qq.com/s/QGCvYvWz60o_qBX6YbZCFw">Kubernetes 集群部署 RabbitMQ + exporter (单节点)</a></li>
+<li><a href="https://mp.weixin.qq.com/s/lCeWAC4tbh_624f7oDUs2g">Kubernetes 集群部署 MongoDB+exporter (单节点)</a></li>
+</ul><ol start="10">
+<li>Logstash 的部署：<a href="https://mp.weixin.qq.com/s/D7Xuw_8nsituhR33BpjU2w">整合ELK实现日志收集</a></li>
+<li>Kubernetes集群资源监控的部署：</li>
+</ol><ul>
+<li><a href="https://mp.weixin.qq.com/s/AOl_z0zMuPzRlf36J6OLMg">Kubernetes 集群监控 kube-prometheus 部署</a></li>
+<li><a href="https://mp.weixin.qq.com/s/T1Yhbw2efw-wjKu1PZyudg">Kubernetes 集群监控 controller-manager &amp; scheduler 组件</a></li>
+<li><a href="https://mp.weixin.qq.com/s/chvukvjmCDvrYqYapRCEkA">Kubernetes 集群监控 ETCD 组件</a></li>
+</ul><ol start="12">
+<li>日志聚合部署的部署：<a href="https://mp.weixin.qq.com/s/7shBCfpKRBBQDsutSpClhQ">Kubernetes 集群日志监控 EFK 安装</a></li>
+<li>依赖组件的部署：</li>
+</ol><ul>
+<li><a href="https://mp.weixin.qq.com/s/yuAU-qWeTr4svaSI497sbQ">Kubernetes 集群监控 kube-prometheus 自动发现</a></li>
+<li>APM 链路跟踪的部署：<a href="https://mp.weixin.qq.com/s/xTr3IBBUggXdCGL047RF0Q">Kubnernetes 集群部署 Zipkin+Kafka+ElasticSearch 实现链路追踪</a></li>
+</ul><ol start="14">
+<li>微服务项目介绍：<a href="https://mp.weixin.qq.com/s/a8nDBbkuvSjreaCxuM2PuQ">《高楼的性能工程实战课》微服务电商项目技术全解析</a></li>
+</ol>

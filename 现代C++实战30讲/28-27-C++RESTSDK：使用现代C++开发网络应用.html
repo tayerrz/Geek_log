@@ -1,0 +1,524 @@
+<p>你好，我是吴咏炜。</p><p>在实战篇，我们最后要讲解的一个库是 C++ REST SDK（也写作 cpprestsdk）<span class="orange">[1]</span>，一个支持 HTTP 协议 <span class="orange">[2]</span>、主要用于 RESTful <span class="orange">[3]</span> 接口开发的 C++ 库。</p><h2>初识 C++ REST SDK</h2><p>向你提一个问题，你认为用多少行代码可以写出一个类似于 curl <span class="orange">[4]</span> 的 HTTP 客户端？</p><p>使用 C++ REST SDK 的话，答案是，只需要五十多行有效代码（即使是适配到我们目前的窄小的手机屏幕上）。请看：</p><pre><code class="language-c++">#include &lt;iostream&gt;
+#ifdef _WIN32
+#include &lt;fcntl.h&gt;
+#include &lt;io.h&gt;
+#endif
+#include &lt;cpprest/http_client.h&gt;
+
+using namespace utility;
+using namespace web::http;
+using namespace web::http::client;
+using std::cerr;
+using std::endl;
+
+#ifdef _WIN32
+#define tcout std::wcout
+#else
+#define tcout std::cout
+#endif
+
+auto get_headers(http_response resp)
+{
+  auto headers = resp.to_string();
+  auto end =
+    headers.find(U("\r\n\r\n"));
+  if (end != string_t::npos) {
+    headers.resize(end + 4);
+  };
+  return headers;
+}
+
+auto get_request(string_t uri)
+{
+  http_client client{uri};
+  // 用 GET 方式发起一个客户端请求
+  auto request =
+    client.request(methods::GET)
+      .then([](http_response resp) {
+        if (resp.status_code() !=
+            status_codes::OK) {
+          // 不 OK，显示当前响应信息
+          auto headers =
+            get_headers(resp);
+          tcout &lt;&lt; headers;
+        }
+        // 进一步取出完整响应
+        return resp
+          .extract_string();
+      })
+      .then([](string_t str) {
+        // 输出到终端
+        tcout &lt;&lt; str;
+      });
+  return request;
+}
+
+#ifdef _WIN32
+int wmain(int argc, wchar_t* argv[])
+#else
+int main(int argc, char* argv[])
+#endif
+{
+#ifdef _WIN32
+  _setmode(_fileno(stdout),
+           _O_WTEXT);
+#endif
+
+  if (argc != 2) {
+    cerr &lt;&lt; "A URL is needed\n";
+    return 1;
+  }
+
+  // 等待请求及其关联处理全部完成
+  try {
+    auto request =
+      get_request(argv[1]);
+    request.wait();
+  }
+  // 处理请求过程中产生的异常
+  catch (const std::exception&amp; e) {
+    cerr &lt;&lt; "Error exception: "
+         &lt;&lt; e.what() &lt;&lt; endl;
+    return 1;
+  }
+}
+</code></pre><!-- [[[read_end]]] --><p>这个代码有点复杂，需要讲解一下：</p><ul>
+<li>第 14–18 行，我们根据平台来定义 <code>tcout</code>，确保多语言的文字能够正确输出。</li>
+<li>第 20–29 行，我们定义了 <code>get_headers</code>，来从 <code>http_response</code> 中取出头部的字符串表示。</li>
+<li>第 36 行，构造了一个客户端请求，并使用 <code>then</code> 方法串联了两个下一步的动作。<code>http_client::request</code> 的返回值是 <code>pplx::task&lt;http_response&gt;</code>。<code>then</code> 是 <code>pplx::task</code> 类模板的成员函数，参数是能接受其类型参数对象的函数对象。除了最后一个 <code>then</code> 块，其他每个 <code>then</code> 里都应该返回一个  <code>pplx::task</code>，而 <code>task</code> 的内部类型就是下一个 <code>then</code> 块里函数对象接受的参数的类型。</li>
+<li>第 37 行开始，是第一段异步处理代码。参数类型是 <code>http_response</code>——因为<code>http_client::request</code> 的返回值是 <code>pplx::task&lt;http_response&gt;</code>。代码中判断如果响应的 HTTP 状态码不是 200 OK，就会显示响应头来帮助调试。然后，进一步取出所有的响应内容（可能需要进一步的异步处理，等待后续的 HTTP 响应到达）。</li>
+<li>第 49 行开始，是第二段异步处理代码。参数类型是 <code>string_t</code>——因为上一段 <code>then</code> 块的返回值是 <code>pplx::task&lt;string_t&gt;</code>。代码中就是简单地把需要输出的内容输出到终端。</li>
+<li>第 56–60 行，我们根据平台来定义合适的程序入口，确保命令行参数的正确处理。</li>
+<li>第 62–65 行，在 Windows 上我们把标准输出设置成宽字符模式，来确保宽字符（串）能正确输出（参考<a href="https://time.geekbang.org/column/article/179357">[第 11 讲]</a> ）。注意 <code>string_t</code> 在 Windows 上是 <code>wstring</code>，在其他平台上是 <code>string</code>。</li>
+<li>第 72–83 行，如注释所言，产生 HTTP 请求、等待 HTTP 请求完成，并处理相关的异常。</li>
+</ul><p>整体而言，这个代码还是很简单的，虽然这种代码风格，对于之前没有接触过这种函数式编程风格的人来讲会有点奇怪——这被称作持续传递风格（continuation-passing style），显式地把上一段处理的结果传递到下一个函数中。这个代码已经处理了 Windows 环境和 Unix 环境的差异，底下是相当复杂的。</p><p>另外提醒一下，在 Windows 上如果你把源代码存成 UTF-8 的话，需要确保文件以 BOM 字符打头。Windows 的编辑器通常缺省就会做到；在 Vim 里，可以通过 <code>set bomb</code> 命令做到这一点。</p><h2>安装和编译</h2><p>上面的代码本身虽然简单，但要把它编译成可执行文件比我们之前讲的代码都要复杂——C++ REST SDK 有外部依赖，在 Windows 上和 Unix 上还不太一样。它的编译和安装也略复杂，如果你没有这方面的经验的话，建议尽量使用平台推荐的二进制包的安装方式。</p><p>由于其依赖较多，使用它的编译命令行也较为复杂。正式项目中绝对是需要使用项目管理软件的（如 cmake）。此处，我给出手工编译的典型命令行，仅供你尝试编译上面的例子作参考。</p><p>Windows MSVC：</p><blockquote>
+<p><code>cl /EHsc /std:c++17 test.cpp cpprest.lib zlib.lib libeay32.lib ssleay32.lib winhttp.lib httpapi.lib bcrypt.lib crypt32.lib advapi32.lib gdi32.lib user32.lib</code></p>
+</blockquote><p>Linux GCC：</p><blockquote>
+<p><code>g++ -std=c++17 -pthread test.cpp -lcpprest -lcrypto -lssl -lboost_thread -lboost_chrono -lboost_system</code></p>
+</blockquote><p>macOS Clang：</p><blockquote>
+<p><code>clang++ -std=c++17 test.cpp -lcpprest -lcrypto -lssl -lboost_thread-mt -lboost_chrono-mt</code></p>
+</blockquote><h2>概述</h2><p>有了初步印象之后，现在我们可以回过头看看 C++ REST SDK 到底是什么了。它是一套用来开发 HTTP 客户端和服务器的现代异步 C++ 代码库，支持以下特性（随平台不同会有所区别）：</p><ul>
+<li>HTTP 客户端</li>
+<li>HTTP 服务器</li>
+<li>任务</li>
+<li>JSON</li>
+<li>URI</li>
+<li>异步流</li>
+<li>WebSocket 客户端</li>
+<li>OAuth 客户端</li>
+</ul><p>上面的例子里用到了 HTTP 客户端、任务和 URI（实际上是由 <code>string_t</code> 隐式构造了 <code>uri</code>），我们下面再介绍一下异步流、JSON 和 HTTP 服务器。</p><h2>异步流</h2><p>C++ REST SDK 里实现了一套异步流，能够实现对文件的异步读写。下面的例子展示了我们如何把网络请求的响应异步地存储到文件 results.html 中：</p><pre><code class="language-c++">#include &lt;iostream&gt;
+#include &lt;utility&gt;
+#ifdef _WIN32
+#include &lt;fcntl.h&gt;
+#include &lt;io.h&gt;
+#endif
+#include &lt;stddef.h&gt;
+#include &lt;cpprest/http_client.h&gt;
+#include &lt;cpprest/filestream.h&gt;
+
+using namespace utility;
+using namespace web::http;
+using namespace web::http::client;
+using namespace concurrency::streams;
+using std::cerr;
+using std::endl;
+
+#ifdef _WIN32
+#define tcout std::wcout
+#else
+#define tcout std::cout
+#endif
+
+auto get_headers(http_response resp)
+{
+  auto headers = resp.to_string();
+  auto end =
+    headers.find(U("\r\n\r\n"));
+  if (end != string_t::npos) {
+    headers.resize(end + 4);
+  };
+  return headers;
+}
+
+auto get_request(string_t uri)
+{
+  http_client client{uri};
+  // 用 GET 方式发起一个客户端请求
+  auto request =
+    client.request(methods::GET)
+      .then([](http_response resp) {
+        if (resp.status_code() ==
+            status_codes::OK) {
+          // 正常的话
+          tcout &lt;&lt; U("Saving...\n");
+          ostream fs;
+          fstream::open_ostream(
+            U("results.html"),
+            std::ios_base::out |
+              std::ios_base::trunc)
+            .then(
+              [&amp;fs,
+               resp](ostream os) {
+                fs = os;
+                // 读取网页内容到流
+                return resp.body()
+                  .read_to_end(
+                    fs.streambuf());
+              })
+            .then(
+              [&amp;fs](size_t size) {
+                // 然后关闭流
+                fs.close();
+                tcout
+                  &lt;&lt; size
+                  &lt;&lt; U(" bytes "
+                       "saved\n");
+              })
+            .wait();
+        } else {
+          // 否则显示当前响应信息
+          auto headers =
+            get_headers(resp);
+          tcout &lt;&lt; headers;
+          tcout
+            &lt;&lt; resp.extract_string()
+                 .get();
+        }
+      });
+  return request;
+}
+
+#ifdef _WIN32
+int wmain(int argc, wchar_t* argv[])
+#else
+int main(int argc, char* argv[])
+#endif
+{
+#ifdef _WIN32
+  _setmode(_fileno(stdout),
+           _O_WTEXT);
+#endif
+
+  if (argc != 2) {
+    cerr &lt;&lt; "A URL is needed\n";
+    return 1;
+  }
+
+  // 等待请求及其关联处理全部完成
+  try {
+    auto request =
+      get_request(argv[1]);
+    request.wait();
+  }
+  // 处理请求过程中产生的异常
+  catch (const std::exception&amp; e) {
+    cerr &lt;&lt; "Error exception: "
+         &lt;&lt; e.what() &lt;&lt; endl;
+  }
+}
+</code></pre><p>跟上一个例子比，我们去掉了原先的第二段处理统一输出的异步处理代码，但加入了一段嵌套的异步代码。有几个地方需要注意一下：</p><ul>
+<li>C++ REST SDK 的对象基本都是基于 <code>shared_ptr</code> 用引用计数实现的，因而可以轻松大胆地进行复制。</li>
+<li>虽然 <code>string_t</code> 在 Windows 上是 <code>wstring</code>，但文件流无论在哪个平台上都是以 UTF-8 的方式写入，符合目前的主流处理方式（<code>wofstream</code> 的行为跟平台和环境相关）。</li>
+<li><code>extract_string</code> 的结果这次没有传递到下一段，而是直接用 <code>get</code> 获得了最终结果（类似于<a href="https://time.geekbang.org/column/article/186689">[第 19 讲]</a> 中的 <code>future</code>）。</li>
+</ul><p>这个例子的代码是基于 <a href="https://github.com/Microsoft/cpprestsdk/wiki/Getting-Started-Tutorial">cpprestsdk 官方的例子</a>改编的。但我做的下面这些更动值得提一下：</p><ul>
+<li>去除了不必要的 <code>shared_ptr</code> 的使用。</li>
+<li><code>fstream::open_ostream</code> 缺省的文件打开方式是 <code>std::ios_base::out</code>，官方例子没有用 <code>std::ios_base::trunc</code>，导致不能清除文件中的原有内容。此处 C++ REST SDK 的 <code>file_stream</code> 行为跟标准 C++ 的 <code>ofstream</code> 是不一样的：后者缺省打开方式也是 <code>std::ios_base::out</code>，但此时文件内容<strong>会</strong>被自动清除。</li>
+<li>沿用我的前一个例子，先进行请求再打开文件流，而不是先打开文件流再发送网络请求，符合实际流程。</li>
+<li>这样做的一个结果就是 <code>then</code> 不完全是顺序的了，有嵌套，增加了复杂度，但展示了实际可能的情况。</li>
+</ul><h2>JSON 支持</h2><p>在基于网页的开发中，JSON <span class="orange">[5]</span> 早已取代 XML 成了最主流的数据交换方式。REST 接口本身就是基于 JSON 的，自然，C++ REST SDK 需要对 JSON 有很好的支持。</p><p>JSON 本身可以在网上找到很多介绍的文章，我这儿就不多讲了。有几个 C++ 相关的关键点需要提一下：</p><ul>
+<li>JSON 的基本类型是空值类型、布尔类型、数字类型和字符串类型。其中空值类型和数字类型在 C++ 里是没有直接对应物的。数字类型在 C++ 里可能映射到 <code>double</code>，也可能是 <code>int32_t</code> 或 <code>int64_t</code>。</li>
+<li>JSON 的复合类型是数组（array）和对象（object）。JSON 数组像 C++ 的 <code>vector</code>，但每个成员的类型可以是任意 JSON 类型，而不像 <code>vector</code> 通常是同质的——所有成员属于同一类型。JSON 对象像 C++ 的 <code>map</code>，键类型为 JSON 字符串，值类型则为任意 JSON 类型。JSON 标准不要求对象的各项之间有顺序，不过，从实际项目的角度，我个人觉得保持顺序还是非常有用的。</li>
+</ul><p>如果你去搜索“c++ json”的话，还是可以找到一些不同的 JSON 实现的。功能最完整、名声最响的目前似乎是 nlohmann/json <span class="orange">[6]</span>，而腾讯释出的 RapidJSON <span class="orange">[7]</span> 则以性能闻名 <span class="orange">[8]</span>。需要注意一下各个实现之间的区别：</p><ul>
+<li>nlohmann/json 不支持对 JSON 的对象（object）保持赋值顺序；RapidJSON 保持赋值顺序；C++ REST SDK 可选保持赋值顺序（通过 <code>web::json::keep_object_element_order</code> 和 <code>web::json::value::object</code> 的参数）。</li>
+<li>nlohmann/json 支持最友好的初始化语法，可以使用初始化列表和 JSON 字面量；C++ REST SDK 只能逐项初始化，并且一般应显式调用 <code>web::json::value</code> 的构造函数（接受布尔类型和字符串类型的构造函数有 <code>explicit</code> 标注）；RapidJSON 介于中间，不支持初始化列表和字面量，但赋值可以直接进行。</li>
+<li>nlohmann/json 和 C++ REST SDK 支持直接在用方括号 <code>[]</code> 访问不存在的 JSON 数组（array）成员时改变数组的大小；RapidJSON 的接口不支持这种用法，要向 JSON 数组里添加成员要麻烦得多。</li>
+<li>作为性能的代价，RapidJSON 里在初始化字符串值时，只会传递指针值；用户需要保证字符串在 JSON 值使用过程中的有效性。要复制字符串的话，接口要麻烦得多。</li>
+<li>RapidJSON 的 JSON 对象没有 <code>begin</code> 和 <code>end</code> 方法，因而无法使用标准的基于范围的 for 循环。总体而言，RapidJSON 的接口显得最特别、不通用。</li>
+</ul><p>如果你使用 C++ REST SDK 的其他功能，你当然也没有什么选择；否则，你可以考虑一下其他的 JSON 实现。下面，我们就只讨论 C++ REST SDK 里的 JSON 了。</p><p>在 C++ REST SDK 里，核心的类型是 <code>web::json::value</code>，这就对应到我前面说的“任意 JSON 类型”了。还是拿例子说话（改编自 RapidJSON 的例子）：</p><pre><code class="language-c++">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include &lt;utility&gt;
+#include &lt;assert.h&gt;
+#ifdef _WIN32
+#include &lt;fcntl.h&gt;
+#include &lt;io.h&gt;
+#endif
+#include &lt;cpprest/json.h&gt;
+
+using namespace std;
+using namespace utility;
+using namespace web;
+
+#ifdef _WIN32
+#define tcout std::wcout
+#else
+#define tcout std::cout
+#endif
+
+int main()
+{
+#ifdef _WIN32
+  _setmode(_fileno(stdout),
+           _O_WTEXT);
+#endif
+
+  // 测试的 JSON 字符串
+  string_t json_str = U(R"(
+    {
+      "s": "你好，世界",
+      "t": true,
+      "f": false,
+      "n": null,
+      "i": 123,
+      "d": 3.1416,
+      "a": [1, 2, 3]
+    })");
+  tcout &lt;&lt; "Original JSON:"
+        &lt;&lt; json_str &lt;&lt; endl;
+
+  // 保持元素顺序并分析 JSON 字符串
+  json::keep_object_element_order(
+    true);
+  auto document =
+    json::value::parse(json_str);
+
+  // 遍历对象成员并输出类型
+  static const char* type_names[] =
+    {
+      "Number", "Boolean", "String",
+      "Object", "Array",   "Null",
+    };
+  for (auto&amp;&amp; value :
+       document.as_object()) {
+    tcout &lt;&lt; "Type of member "
+          &lt;&lt; value.first &lt;&lt; " is "
+          &lt;&lt; type_names[value.second
+                          .type()]
+          &lt;&lt; endl;
+  }
+
+  // 检查 document 是对象
+  assert(document.is_object());
+
+  // 检查 document["s"] 是字符串
+  assert(document.has_field(U("s")));
+  assert(
+    document[U("s")].is_string());
+  tcout &lt;&lt; "s = "
+        &lt;&lt; document[U("s")] &lt;&lt; endl;
+
+  // 检查 document["t"] 是字符串
+  assert(
+    document[U("t")].is_boolean());
+  tcout
+    &lt;&lt; "t = "
+    &lt;&lt; (document[U("t")].as_bool()
+          ? "true"
+          : "false")
+    &lt;&lt; endl;
+
+  // 检查 document["f"] 是字符串
+  assert(
+    document[U("f")].is_boolean());
+  tcout
+    &lt;&lt; "f = "
+    &lt;&lt; (document[U("f")].as_bool()
+          ? "true"
+          : "false")
+    &lt;&lt; endl;
+
+  // 检查 document["f"] 是空值
+  tcout
+    &lt;&lt; "n = "
+    &lt;&lt; (document[U("n")].is_null()
+          ? "null"
+          : "?")
+    &lt;&lt; endl;
+
+  // 检查 document["i"] 是整数
+  assert(
+    document[U("i")].is_number());
+  assert(
+    document[U("i")].is_integer());
+  tcout &lt;&lt; "i = "
+        &lt;&lt; document[U("i")] &lt;&lt; endl;
+
+  // 检查 document["d"] 是浮点数
+  assert(
+    document[U("d")].is_number());
+  assert(
+    document[U("d")].is_double());
+  tcout &lt;&lt; "d = "
+        &lt;&lt; document[U("d")] &lt;&lt; endl;
+
+  {
+    // 检查 document["a"] 是数组
+    auto&amp; a = document[U("a")];
+    assert(a.is_array());
+
+    // 测试读取数组元素并转换成整数
+    int y = a[0].as_integer();
+    (void)y;
+
+    // 遍历数组成员并输出
+    tcout &lt;&lt; "a = ";
+    for (auto&amp;&amp; value :
+         a.as_array()) {
+      tcout &lt;&lt; value &lt;&lt; ' ';
+    }
+    tcout &lt;&lt; endl;
+  }
+
+  // 修改 document["i"] 为长整数
+  {
+    uint64_t bignum = 65000;
+    bignum *= bignum;
+    bignum *= bignum;
+    document[U("i")] = bignum;
+
+    assert(!document[U("i")]
+              .as_number()
+              .is_int32());
+    assert(document[U("i")]
+             .as_number()
+             .to_uint64() ==
+           bignum);
+    tcout &lt;&lt; "i is changed to "
+          &lt;&lt; document[U("i")]
+          &lt;&lt; endl;
+  }
+
+  // 在数组里添加数值
+  {
+    auto&amp; a = document[U("a")];
+    a[3] = 4;
+    a[4] = 5;
+    tcout &lt;&lt; "a is changed to "
+          &lt;&lt; document[U("a")]
+          &lt;&lt; endl;
+  }
+
+  // 在 JSON 文档里添加布尔值：等号
+  // 右侧 json::value 不能省
+  document[U("b")] =
+    json::value(true);
+
+  // 构造新对象，保持多个值的顺序
+  auto temp =
+    json::value::object(true);
+  // 在新对象里添加字符串：等号右侧
+  // json::value 不能省
+  temp[U("from")] =
+    json::value(U("rapidjson"));
+  temp[U("changed for")] =
+    json::value(U("geekbang"));
+
+  // 把对象赋到文档里；json::value
+  // 内部使用 unique_ptr，因而使用
+  // move 可以减少拷贝
+  document[U("adapted")] =
+    std::move(temp);
+
+  // 完整输出目前的 JSON 对象
+  tcout &lt;&lt; document &lt;&lt; endl;
+}
+</code></pre><p>例子里我加了不少注释，应当可以帮助你看清 JSON 对象的基本用法了。唯一遗憾的是宏 <code>U</code>（类似于<a href="https://time.geekbang.org/column/article/179357">[第 11 讲]</a> 里提到过的 <code>_T</code>）的使用有点碍眼：要确保代码在 Windows 下和 Unix 下都能工作，目前这还是必要的。</p><p>建议你测试一下这个例子。查看一下结果。</p><p>C++ REST SDK 里的 <code>http_request</code> 和 <code>http_response</code> 都对 JSON 有原生支持，如可以使用 <code>extract_json</code> 成员函数来异步提取 HTTP 请求或响应体中的 JSON 内容。</p><h2>HTTP 服务器</h2><p>前面我们提到了如何使用 C++ REST SDK 来快速搭建一个 HTTP 客户端。同样，我们也可以使用 C++ REST SDK 来快速搭建一个 HTTP 服务器。在三种主流的操作系统上，C++ REST SDK 的 <code>http_listener</code> 会通过调用 Boost.Asio <span class="orange">[9]</span> 和操作系统的底层接口（IOCP、epoll 或 kqueue）来完成功能，向使用者隐藏这些细节、提供一个简单的编程接口。</p><p>我们将搭建一个最小的 REST 服务器，只能处理一个 sayHi 请求。客户端应当向服务器发送一个 HTTP 请求，URI 是：</p><blockquote>
+<p><code>/sayHi?name=…</code></p>
+</blockquote><p>“…”部分代表一个名字，而服务器应当返回一个 JSON 的回复，形如：</p><pre><code class="language-json">{"msg": "Hi, …!"}
+</code></pre><p>这个服务器的有效代码行同样只有六十多行，如下所示：</p><pre><code class="language-c++">#include &lt;exception&gt;
+#include &lt;iostream&gt;
+#include &lt;map&gt;
+#include &lt;string&gt;
+#ifdef _WIN32
+#include &lt;fcntl.h&gt;
+#include &lt;io.h&gt;
+#endif
+#include &lt;cpprest/http_listener.h&gt;
+#include &lt;cpprest/json.h&gt;
+
+using namespace std;
+using namespace utility;
+using namespace web;
+using namespace web::http;
+using namespace web::http::
+  experimental::listener;
+
+#ifdef _WIN32
+#define tcout std::wcout
+#else
+#define tcout std::cout
+#endif
+
+void handle_get(http_request req)
+{
+  auto&amp; uri = req.request_uri();
+
+  if (uri.path() != U("/sayHi")) {
+    req.reply(
+      status_codes::NotFound);
+    return;
+  }
+
+  tcout &lt;&lt; uri::decode(uri.query())
+        &lt;&lt; endl;
+
+  auto query =
+    uri::split_query(uri.query());
+  auto it = query.find(U("name"));
+  if (it == query.end()) {
+    req.reply(
+      status_codes::BadRequest,
+      U("Missing query info"));
+    return;
+  }
+
+  auto answer =
+    json::value::object(true);
+  answer[U("msg")] = json::value(
+    string_t(U("Hi, ")) +
+    uri::decode(it-&gt;second) +
+    U("!"));
+
+  req.reply(status_codes::OK,
+            answer);
+}
+
+int main()
+{
+#ifdef _WIN32
+  _setmode(_fileno(stdout),
+           _O_WTEXT);
+#endif
+
+  http_listener listener(
+    U("http://127.0.0.1:8008/"));
+  listener.support(methods::GET,
+                   handle_get);
+
+  try {
+    listener.open().wait();
+
+    tcout &lt;&lt; "Listening. Press "
+             "ENTER to exit.\n";
+    string line;
+    getline(cin, line);
+
+    listener.close().wait();
+  }
+  catch (const exception&amp; e) {
+    cerr &lt;&lt; e.what() &lt;&lt; endl;
+    return 1;
+  }
+}
+</code></pre><p>如果你熟悉 HTTP 协议的话，上面的代码应当是相当直白的。只有少数几个细节我需要说明一下：</p><ul>
+<li>我们调用 <code>http_request::reply</code> 的第二个参数是 <code>json::value</code> 类型，这会让 HTTP 的内容类型（Content-Type）自动置成“application/json”。</li>
+<li><code>http_request::request_uri</code> 函数返回的是 <code>uri</code> 的引用，因此我用 <code>auto&amp;</code> 来接收。<code>uri::split_query</code> 函数返回的是一个普通的 <code>std::map</code>，因此我用 <code>auto</code> 来接收。</li>
+<li><code>http_listener::open</code> 和 <code>http_listener::close</code> 返回的是 <code>pplx::task&lt;void&gt;</code>；当这个任务完成时（<code>wait</code> 调用返回），表示 HTTP 监听器上的对应操作（打开或关闭）真正完成了。</li>
+</ul><p>运行程序，然后在另外一个终端里使用我们的第一个例子生成的可执行文件（或 curl）：</p><blockquote>
+<p><code>curl "http://127.0.0.1:8008/sayHi?name=Peter"</code></p>
+</blockquote><p>我们就应该会得到正确的结果：</p><blockquote>
+<p><code>{"msg":"Hi, Peter!"}</code></p>
+</blockquote><p>你也可以尝试把路径和参数写错，查看一下程序对出错的处理。</p><h2>关于线程的细节</h2><p>C++ REST SDK 使用异步的编程模式，使得写不阻塞的代码变得相当容易。不过，底层它是使用一个线程池来实现的——在 C++20 的协程能被使用之前，并没有什么更理想的跨平台方式可用。</p><p>C++ REST SDK 缺省会开启 40 个线程。在目前的实现里，如果这些线程全部被用完了，会导致系统整体阻塞。反过来，如果你只是用 C++ REST SDK 的 HTTP 客户端，你就不需要这么多线程。这个线程数量目前在代码里是可以控制的。比如，下面的代码会把线程池的大小设为 10：</p><pre><code class="language-c++">#include &lt;pplx/threadpool.h&gt;
+…
+crossplat::threadpool::
+  initialize_with_threads(10);
+</code></pre><p>如果你使用 C++ REST SDK 开发一个服务器，则不仅应当增加线程池的大小，还应当对并发数量进行统计，在并发数接近线程数时主动拒绝新的连接——一般可返回 <code>status_codes::ServiceUnavailable</code>——以免造成整个系统的阻塞。</p><h2>内容小结</h2><p>今天我们对 C++ REST SDK 的主要功能作了一下概要的讲解和演示，让你了解了它的主要功能和这种异步的编程方式。还有很多功能没有讲，但你应该可以通过查文档了解如何使用了。</p><p>这只能算是我们旅程中的一站——因为随着 C++20 的到来，我相信一定会有更多好用的网络开发库出现的。</p><h2>课后思考</h2><p>作为实战篇的最后一讲，内容还是略有点复杂的。如果你一下子消化不了，可以复习前面的相关内容。</p><p>如果对这讲的内容本身没有问题，则可以考虑一下，你觉得 C++ REST SDK 的接口好用吗？如果好用，原因是什么？如果不好用，你有什么样的改进意见？</p><h2><span class="reference">参考资料</span></h2><p><span class="reference">[1] Microsoft, cpprestsdk. <a href="https://github.com/microsoft/cpprestsdk">https://github.com/microsoft/cpprestsdk</a> </span></p><p><span class="reference">[2] Wikipedia, “Hypertext Transfer Protocol”. <a href="https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol">https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol</a> </span></p><p><span class="reference">[2a] 维基百科, “超文本传输协议”. <a href="https://zh.m.wikipedia.org/zh-hans/%E8%B6%85%E6%96%87%E6%9C%AC%E4%BC%A0%E8%BE%93%E5%8D%8F%E8%AE%AE">https://zh.m.wikipedia.org/zh-hans/超文本传输协议</a> </span></p><p><span class="reference">[3] RESTful. <a href="https://restfulapi.net/">https://restfulapi.net/</a> </span></p><p><span class="reference">[4] curl. <a href="https://curl.haxx.se/">https://curl.haxx.se/</a> </span></p><p><span class="reference">[5] JSON. <a href="https://www.json.org/">https://www.json.org/</a> </span></p><p><span class="reference">[6] Niels Lohmann, json. <a href="https://github.com/nlohmann/json">https://github.com/nlohmann/json</a> </span></p><p><span class="reference">[7] Tencent, rapidjson. <a href="https://github.com/Tencent/rapidjson">https://github.com/Tencent/rapidjson</a> </span></p><p><span class="reference">[8] Milo Yip, nativejson-benchmark. <a href="https://github.com/miloyip/nativejson-benchmark">https://github.com/miloyip/nativejson-benchmark</a> </span></p><p><span class="reference">[9] Christopher Kohlhoff, Boost.Asio. <a href="https://www.boost.org/doc/libs/release/doc/html/boost_asio.html">https://www.boost.org/doc/libs/release/doc/html/boost_asio.html</a> </span></p>
